@@ -2,6 +2,8 @@ package com.example.demo.Controllers;
 
 import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
+import com.example.demo.Services.HtmlComparisonService;
+import com.example.demo.Services.HtmlParserService;
 import com.example.demo.Services.HtmlTableService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -9,17 +11,33 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Scanner;
 
 @RestController
 public class MainController {
     
     @Autowired
     private HtmlTableService htmlTableService;
+    
+    @Autowired
+    private HtmlParserService htmlParserService;
+    
+    @Autowired
+    private HtmlComparisonService htmlComparisonService;
     
     @RequestMapping("/test")
     public String test(){
@@ -47,6 +65,47 @@ public class MainController {
         headers.setContentType(MediaType.TEXT_HTML);
         
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
+    }
+    
+    @RequestMapping("/compare")
+    public ResponseEntity<String> compareHtmlFiles(
+//            @RequestParam("file1") MultipartFile file1,
+//            @RequestParam("file2") MultipartFile file2
+    ) {
+        //            URL resource1 = MainController.class.getClassLoader().getResource("deployment_table (1).html");
+//            URL resource2 = MainController.class.getClassLoader().getResource("deployment_table (2).html");
+//            File file1 = new File(resource1.toURI());
+//            File file2 = new File(resource2.toURI());
+        String html1 = "", html2 = "";
+        try (InputStream is = MainController.class.getClassLoader().getResourceAsStream("deployment_table (1).html")) {
+            html1 = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
+            System.out.println(html1);
+        } catch (Exception e) {
+            // Обработка
+        }
+
+        try (InputStream is = MainController.class.getClassLoader().getResourceAsStream("deployment_table (2).html")) {
+            html2 = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
+            System.out.println(html2);
+        } catch (Exception e) {
+            // Обработка
+        }
+
+        // Читаем содержимое файлов
+//            String html1 = new String(file1, StandardCharsets.UTF_8);
+//            String html2 = new String(file2.toString(), StandardCharsets.UTF_8);
+
+        // Парсим HTML таблицы
+        List<Deployment> deployments1 = htmlParserService.parseHtmlTable(html1);
+        List<Deployment> deployments2 = htmlParserService.parseHtmlTable(html2);
+
+        // Генерируем таблицу сравнения
+        String comparisonHtml = htmlComparisonService.generateComparisonTable(deployments1, deployments2);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+
+        return new ResponseEntity<>(comparisonHtml, headers, HttpStatus.OK);
     }
     
     private List<Deployment> generateTestData() {

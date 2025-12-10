@@ -61,21 +61,34 @@ public class HtmlTableService {
         html.append("        <thead>\n");
         html.append("            <tr>\n");
         html.append("                <th>Количество подов</th>\n");
-        html.append("                <th>Название пода</th>\n");
-        html.append("                <th>Название контейнера</th>\n");
-        html.append("                <th>ЦПУ лимиты</th>\n");
-        html.append("                <th>ЦПУ реквесты</th>\n");
-        html.append("                <th>Память лимиты</th>\n");
-        html.append("                <th>Память реквесты</th>\n");
-        html.append("                <th>ЦПУ утилизация макс</th>\n");
-        html.append("                <th>ЦПУ утилизация сред</th>\n");
-        html.append("                <th>ЦПУ утилизация абс</th>\n");
-        html.append("                <th>Утилизация памяти макс</th>\n");
-        html.append("                <th>Утилизация памяти сред</th>\n");
-        html.append("                <th>Утилизация памяти абс</th>\n");
+        html.append("                <th>Deployment</th>\n");
+        html.append("                <th>Container</th>\n");
+        html.append("                <th>CpuLim</th>\n");
+        html.append("                <th>CpuRq</th>\n");
+        html.append("                <th>MemLim</th>\n");
+        html.append("                <th>MemRq</th>\n");
+        html.append("                <th>CpuMaxUse</th>\n");
+        html.append("                <th>CpuAvgUse</th>\n");
+        html.append("                <th>CpuAbsUse</th>\n");
+        html.append("                <th>MemMaxUse</th>\n");
+        html.append("                <th>MemAvgUse</th>\n");
+        html.append("                <th>MemAbsUse</th>\n");
         html.append("            </tr>\n");
         html.append("        </thead>\n");
         html.append("        <tbody>\n");
+        
+        // Переменные для подсчета итогов
+        long sumCpuLim = 0;
+        long sumCpuRq = 0;
+        long sumMemLim = 0;
+        long sumMemRq = 0;
+        long sumCpuAbsUse = 0;
+        long sumMemAbsUse = 0;
+        long sumCpuMaxUse = 0;
+        long sumCpuAvgUse = 0;
+        long sumMemMaxUse = 0;
+        long sumMemAvgUse = 0;
+        int totalContainers = 0;
         
         // Заполнение таблицы данными
         for (Deployment deployment : deployments) {
@@ -102,46 +115,72 @@ public class HtmlTableService {
                 
                 // ЦПУ лимиты
                 html.append("                <td>").append(container.getCpuLim()).append("</td>\n");
+                sumCpuLim += container.getCpuLim();
                 
                 // ЦПУ реквесты
                 html.append("                <td>").append(container.getCpuRq()).append("</td>\n");
+                sumCpuRq += container.getCpuRq();
                 
                 // Память лимиты
                 html.append("                <td>").append(container.getMemLim()).append("</td>\n");
+                sumMemLim += container.getMemLim();
                 
                 // Память реквесты
                 html.append("                <td>").append(container.getMemRq()).append("</td>\n");
+                sumMemRq += container.getMemRq();
                 
                 // ЦПУ утилизация макс с цветовой подсветкой
                 String cpuMaxClass = getCpuColorClass(container.getCpuMaxPercent());
                 html.append("                <td class=\"").append(cpuMaxClass).append("\">")
-                    .append(container.getCpuMaxPercent()).append("</td>\n");
+                    .append(container.getCpuMaxPercent()).append("%</td>\n");
+                sumCpuMaxUse += container.getCpuMaxPercent();
                 
                 // ЦПУ утилизация сред с цветовой подсветкой
                 String cpuAvgClass = getCpuColorClass(container.getCpuAvgPercent());
                 html.append("                <td class=\"").append(cpuAvgClass).append("\">")
-                    .append(container.getCpuAvgPercent()).append("</td>\n");
+                    .append(container.getCpuAvgPercent()).append("%</td>\n");
+                sumCpuAvgUse += container.getCpuAvgPercent();
                 
                 // ЦПУ утилизация абс
                 html.append("                <td>").append(container.getCpuMaxAbs()).append("</td>\n");
+                sumCpuAbsUse += container.getCpuMaxAbs();
                 
                 // Утилизация памяти макс с цветовой подсветкой
                 String memMaxClass = getMemColorClass(container.getMemMaxPercent());
                 html.append("                <td class=\"").append(memMaxClass).append("\">")
-                    .append(container.getMemMaxPercent()).append("</td>\n");
+                    .append(container.getMemMaxPercent()).append("%</td>\n");
+                sumMemMaxUse += container.getMemMaxPercent();
                 
                 // Утилизация памяти сред с цветовой подсветкой
                 String memAvgClass = getMemColorClass(container.getMemAvgPercent());
                 html.append("                <td class=\"").append(memAvgClass).append("\">")
-                    .append(container.getMemAvgPercent()).append("</td>\n");
+                    .append(container.getMemAvgPercent()).append("%</td>\n");
+                sumMemAvgUse += container.getMemAvgPercent();
                 
                 // Утилизация памяти абс
                 html.append("                <td>").append(container.getMemMaxAbs()).append("</td>\n");
+                sumMemAbsUse += container.getMemMaxAbs();
                 
                 html.append("            </tr>\n");
                 isFirstRow = false;
+                totalContainers++;
             }
         }
+        
+        // Итоговая строка
+        html.append("            <tr style=\"font-weight: bold; background-color: #e0e0e0;\">\n");
+        html.append("                <td colspan=\"3\">Итого</td>\n");
+        html.append("                <td>").append(sumCpuLim).append("</td>\n");
+        html.append("                <td>").append(sumCpuRq).append("</td>\n");
+        html.append("                <td>").append(sumMemLim).append("</td>\n");
+        html.append("                <td>").append(sumMemRq).append("</td>\n");
+        html.append("                <td>").append(Math.round((double)sumCpuMaxUse / totalContainers)).append("%</td>\n");
+        html.append("                <td>").append(Math.round((double)sumCpuAvgUse / totalContainers)).append("%</td>\n");
+        html.append("                <td>").append(sumCpuAbsUse).append("</td>\n");
+        html.append("                <td>").append(Math.round((double)sumMemMaxUse / totalContainers)).append("%</td>\n");
+        html.append("                <td>").append(Math.round((double)sumMemAvgUse / totalContainers)).append("%</td>\n");
+        html.append("                <td>").append(sumMemAbsUse).append("</td>\n");
+        html.append("            </tr>\n");
         
         html.append("        </tbody>\n");
         html.append("    </table>\n");
