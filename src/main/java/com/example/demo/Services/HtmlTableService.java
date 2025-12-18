@@ -48,10 +48,12 @@ public class HtmlTableService {
         html.append("        }\n");
         html.append("        .cpu-green { background-color: #90EE90; }\n");
         html.append("        .cpu-yellow { background-color: #FFD700; }\n");
-        html.append("        .cpu-red { background-color: #FFB6C1; }\n");
+        html.append("        .cpu-red-light { background-color: #FFB6C1; }\n");
+        html.append("        .cpu-red-dark { background-color: #DC143C; }\n");
         html.append("        .mem-green { background-color: #90EE90; }\n");
         html.append("        .mem-yellow { background-color: #FFD700; }\n");
-        html.append("        .mem-red { background-color: #FFB6C1; }\n");
+        html.append("        .mem-red-light { background-color: #FFB6C1; }\n");
+        html.append("        .mem-red-dark { background-color: #DC143C; }\n");
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
@@ -195,8 +197,10 @@ public class HtmlTableService {
             return "cpu-green";
         } else if (percent >= 20 && percent <= 59) {
             return "cpu-yellow";
+        } else if (percent >= 0 && percent <= 19) {
+            return "cpu-red-light"; // 0-19% - очень низкая утилизация
         } else {
-            return "cpu-red"; // 0-19 и 80-100
+            return "cpu-red-dark"; // >= 80% - критически высокая утилизация (включая > 100%)
         }
     }
     
@@ -205,8 +209,10 @@ public class HtmlTableService {
             return "mem-green";
         } else if (percent >= 20 && percent <= 59) {
             return "mem-yellow";
+        } else if (percent >= 0 && percent <= 19) {
+            return "mem-red-light"; // 0-19% - очень низкая утилизация
         } else {
-            return "mem-red"; // 0-19 и 80-100
+            return "mem-red-dark"; // >= 80% - критически высокая утилизация (включая > 100%)
         }
     }
 }
