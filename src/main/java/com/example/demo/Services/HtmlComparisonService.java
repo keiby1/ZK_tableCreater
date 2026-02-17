@@ -19,6 +19,7 @@ public class HtmlComparisonService {
         html.append("<head>\n");
         html.append("    <meta charset=\"UTF-8\">\n");
         html.append("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
+        html.append("    <link rel=\"icon\" href=\"/image/leaf.png\" type=\"image/png\">\n");
         html.append("    <title>Deployment Comparison Table</title>\n");
         html.append("    <style>\n");
         html.append("        body {\n");
