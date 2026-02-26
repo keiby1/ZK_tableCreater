@@ -54,23 +54,24 @@ public class HtmlParserService {
             }
             
             if (hasRowspan) {
-                // Новая группа деплоймента
-                // Извлекаем количество подов (первая ячейка)
+                // Поддержка старого формата (13 ячеек) и нового (14 ячеек с «Время старта»)
+                if (cells.size() < 13) {
+                    continue;
+                }
                 currentPodCount = parseInt(cells.get(0));
-                
-                // Извлекаем название деплоймента (вторая ячейка)
                 currentDeploymentName = cells.get(1);
-                
-                // Создаем новый деплоймент
                 currentDeployment = new Deployment();
                 currentDeployment.setName(currentDeploymentName);
                 currentDeployment.setPodCount(currentPodCount);
+                currentDeployment.setStartTime(cells.size() >= 14 ? parseInt(cells.get(13)) : 0);
                 currentDeployment.setContainers(new LinkedList<>());
                 deployments.add(currentDeployment);
-                
-                cellOffset = 0; // Первые две ячейки присутствуют
+                cellOffset = 0;
             } else {
-                cellOffset = 2; // Первые две ячейки отсутствуют из-за rowspan
+                cellOffset = 2;
+                if (cells.size() < 11) {
+                    continue;
+                }
             }
             
             if (currentDeployment == null || cells.size() < 13 - cellOffset) {

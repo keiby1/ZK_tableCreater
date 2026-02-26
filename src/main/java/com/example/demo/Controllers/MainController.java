@@ -39,9 +39,14 @@ public class MainController {
     @Autowired
     private HtmlComparisonService htmlComparisonService;
     
-    @RequestMapping("/test")
+    @RequestMapping("/ping")
     public String test(){
         return "2";
+    }
+
+    @RequestMapping
+    public ResponseEntity<String> mainPageView(){
+        return new ResponseEntity<>("Утилита для получения информации о ресурсах и их утилизации в ДА для ЗелКора", HttpStatus.OK);
     }
     
     @GetMapping("/getHtml")
@@ -76,19 +81,21 @@ public class MainController {
 //            URL resource2 = MainController.class.getClassLoader().getResource("deployment_table (2).html");
 //            File file1 = new File(resource1.toURI());
 //            File file2 = new File(resource2.toURI());
-        String html1 = "", html2 = "";
+        String html1 = "";
+        String html2 = "";
         try (InputStream is = MainController.class.getClassLoader().getResourceAsStream("deployment_table (1).html")) {
-            html1 = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
-            System.out.println(html1);
+            if (is != null) {
+                html1 = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
+            }
         } catch (Exception e) {
-            // Обработка
+            // ресурс не найден или ошибка чтения
         }
-
         try (InputStream is = MainController.class.getClassLoader().getResourceAsStream("deployment_table (2).html")) {
-            html2 = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
-            System.out.println(html2);
+            if (is != null) {
+                html2 = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
+            }
         } catch (Exception e) {
-            // Обработка
+            // ресурс не найден или ошибка чтения
         }
 
         // Читаем содержимое файлов
@@ -99,8 +106,9 @@ public class MainController {
         List<Deployment> deployments1 = htmlParserService.parseHtmlTable(html1);
         List<Deployment> deployments2 = htmlParserService.parseHtmlTable(html2);
 
-        // Генерируем таблицу сравнения
-        String comparisonHtml = htmlComparisonService.generateComparisonTable(deployments1, deployments2);
+        String file1Name = "deployment_table (1).html";
+        String file2Name = "deployment_table (2).html";
+        String comparisonHtml = htmlComparisonService.generateComparisonTable(deployments1, deployments2, file1Name, file2Name);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
@@ -115,6 +123,7 @@ public class MainController {
         Deployment deployment1 = new Deployment();
         deployment1.setName("frontend-deployment");
         deployment1.setPodCount(3);
+        deployment1.setStartTime(45);
         deployment1.setContainers(new LinkedList<>());
         
         Container container1_1 = new Container();
@@ -165,6 +174,7 @@ public class MainController {
         Deployment deployment2 = new Deployment();
         deployment2.setName("backend-deployment");
         deployment2.setPodCount(3);
+        deployment2.setStartTime(95);
         deployment2.setContainers(new LinkedList<>());
         
         Container container2_1 = new Container();
@@ -215,6 +225,7 @@ public class MainController {
         Deployment deployment3 = new Deployment();
         deployment3.setName("monitoring-deployment");
         deployment3.setPodCount(3);
+        deployment3.setStartTime(150);
         deployment3.setContainers(new LinkedList<>());
         
         Container container3_1 = new Container();

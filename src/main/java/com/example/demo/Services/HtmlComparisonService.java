@@ -12,8 +12,15 @@ import java.util.Map;
 public class HtmlComparisonService {
 
     public String generateComparisonTable(List<Deployment> deployments1, List<Deployment> deployments2) {
+        return generateComparisonTable(deployments1, deployments2, null, null);
+    }
+
+    public String generateComparisonTable(List<Deployment> deployments1, List<Deployment> deployments2,
+                                         String fileName1, String fileName2) {
         StringBuilder html = new StringBuilder();
-        
+        String name1 = fileName1 != null && !fileName1.isEmpty() ? fileName1 : "Файл 1";
+        String name2 = fileName2 != null && !fileName2.isEmpty() ? fileName2 : "Файл 2";
+
         html.append("<!DOCTYPE html>\n");
         html.append("<html lang=\"ru\">\n");
         html.append("<head>\n");
@@ -27,6 +34,9 @@ public class HtmlComparisonService {
         html.append("            margin: 20px;\n");
         html.append("            background-color: #f5f5f5;\n");
         html.append("        }\n");
+        html.append("        .compare-header { margin-bottom: 16px; padding: 12px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 6px; }\n");
+        html.append("        .compare-header h2 { margin: 0 0 8px 0; font-size: 1.1em; color: #2e7d32; }\n");
+        html.append("        .compare-header p { margin: 4px 0; font-size: 0.95em; color: #333; }\n");
         html.append("        table {\n");
         html.append("            border-collapse: collapse;\n");
         html.append("            width: 100%;\n");
@@ -55,6 +65,11 @@ public class HtmlComparisonService {
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
+        html.append("    <div class=\"compare-header\">\n");
+        html.append("        <h2>Сравнение: ").append(escapeHtml(name1)).append(" и ").append(escapeHtml(name2)).append("</h2>\n");
+        html.append("        <p><strong>Слева</strong> — данные из первого файла (<em>").append(escapeHtml(name1)).append("</em>).</p>\n");
+        html.append("        <p><strong>Справа</strong> — разница в скобках указана относительно второго файла (<em>").append(escapeHtml(name2)).append("</em>).</p>\n");
+        html.append("    </div>\n");
         html.append("    <table>\n");
         
         // Заголовок таблицы
@@ -71,6 +86,7 @@ public class HtmlComparisonService {
         html.append("                <th>CpuAvgUse</th>\n");
         html.append("                <th>MemMaxUse</th>\n");
         html.append("                <th>MemAvgUse</th>\n");
+        html.append("                <th>Время старта</th>\n");
         html.append("            </tr>\n");
         html.append("        </thead>\n");
         html.append("        <tbody>\n");
@@ -180,6 +196,18 @@ public class HtmlComparisonService {
                     .append(" (").append(formatDiff(diffMemAvg)).append(")")
                     .append("</td>\n");
                 
+                // Время старта (по деплойменту, rowspan)
+                if (isFirstRow) {
+                    long start1 = deployment1.getStartTime();
+                    long start2 = deployment2 != null ? deployment2.getStartTime() : start1;
+                    int diffStart = (int) (start1 - start2);
+                    String diffStartClass = getDiffColorClass(diffStart);
+                    html.append("                <td rowspan=\"").append(containerCount).append("\" class=\"").append(diffStartClass).append("\">")
+                        .append(start1).append(" с")
+                        .append(deployment2 != null ? " (" + formatDiff(diffStart) + ")" : "")
+                        .append("</td>\n");
+                }
+                
                 html.append("            </tr>\n");
                 isFirstRow = false;
             }
@@ -209,6 +237,11 @@ public class HtmlComparisonService {
         } else {
             return String.valueOf(diff);
         }
+    }
+
+    private String escapeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 }
 

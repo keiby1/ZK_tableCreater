@@ -9,6 +9,9 @@ import java.util.List;
 @Service
 public class HtmlTableService {
 
+    private static final int MAX_CPU_PER_DEPLOYMENT = 4000;
+    private static final int MAX_RAM_PER_DEPLOYMENT = 10000;
+
     public String generateHtmlTable(List<Deployment> deployments) {
         StringBuilder html = new StringBuilder();
         
@@ -55,6 +58,11 @@ public class HtmlTableService {
         html.append("        .mem-yellow { background-color: #FFD700; }\n");
         html.append("        .mem-red-light { background-color: #FFB6C1; }\n");
         html.append("        .mem-red-dark { background-color: #DC143C; }\n");
+        html.append("        .over-limit { background-color: #505050; color: #fff; }\n");
+        html.append("        .start-green { background-color: #c8e6c9; }\n");
+        html.append("        .start-yellow { background-color: #fff9c4; }\n");
+        html.append("        .start-orange { background-color: #ffe0b2; }\n");
+        html.append("        .start-red { background-color: #ffcdd2; }\n");
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
@@ -76,6 +84,7 @@ public class HtmlTableService {
         html.append("                <th>MemMaxUse</th>\n");
         html.append("                <th>MemAvgUse</th>\n");
         html.append("                <th>MemAbsUse</th>\n");
+        html.append("                <th>Время старта</th>\n");
         html.append("            </tr>\n");
         html.append("        </thead>\n");
         html.append("        <tbody>\n");
@@ -97,6 +106,26 @@ public class HtmlTableService {
         for (Deployment deployment : deployments) {
             int containerCount = deployment.getContainers().size();
             boolean isFirstRow = true;
+
+            // Суммы по контейнерам деплоймента для проверки лимитов
+            long deployCpuLim = 0;
+            long deployCpuRq = 0;
+            long deployMemLim = 0;
+            long deployMemRq = 0;
+            for (Container c : deployment.getContainers()) {
+                deployCpuLim += c.getCpuLim();
+                deployCpuRq += c.getCpuRq();
+                deployMemLim += c.getMemLim();
+                deployMemRq += c.getMemRq();
+            }
+            boolean cpuLimOver = deployCpuLim > MAX_CPU_PER_DEPLOYMENT;
+            boolean cpuRqOver = deployCpuRq > MAX_CPU_PER_DEPLOYMENT;
+            boolean memLimOver = deployMemLim > MAX_RAM_PER_DEPLOYMENT;
+            boolean memRqOver = deployMemRq > MAX_RAM_PER_DEPLOYMENT;
+            String cpuLimClass = cpuLimOver ? "over-limit" : "";
+            String cpuRqClass = cpuRqOver ? "over-limit" : "";
+            String memLimClass = memLimOver ? "over-limit" : "";
+            String memRqClass = memRqOver ? "over-limit" : "";
             
             for (Container container : deployment.getContainers()) {
                 html.append("            <tr>\n");
@@ -116,20 +145,20 @@ public class HtmlTableService {
                 // Название контейнера
                 html.append("                <td>").append(container.getName()).append("</td>\n");
                 
-                // ЦПУ лимиты
-                html.append("                <td>").append(container.getCpuLim()).append("</td>\n");
+                // ЦПУ лимиты — закрашиваем только если сумма CpuLim по деплойменту > 4000
+                appendTd(html, container.getCpuLim(), cpuLimClass);
                 sumCpuLim += container.getCpuLim();
                 
-                // ЦПУ реквесты
-                html.append("                <td>").append(container.getCpuRq()).append("</td>\n");
+                // ЦПУ реквесты — закрашиваем только если сумма CpuRq по деплойменту > 4000
+                appendTd(html, container.getCpuRq(), cpuRqClass);
                 sumCpuRq += container.getCpuRq();
                 
-                // Память лимиты
-                html.append("                <td>").append(container.getMemLim()).append("</td>\n");
+                // Память лимиты — закрашиваем только если сумма MemLim по деплойменту > 10000
+                appendTd(html, container.getMemLim(), memLimClass);
                 sumMemLim += container.getMemLim();
                 
-                // Память реквесты
-                html.append("                <td>").append(container.getMemRq()).append("</td>\n");
+                // Память реквесты — закрашиваем только если сумма MemRq по деплойменту > 10000
+                appendTd(html, container.getMemRq(), memRqClass);
                 sumMemRq += container.getMemRq();
                 
                 // ЦПУ утилизация макс с цветовой подсветкой
@@ -164,6 +193,14 @@ public class HtmlTableService {
                 html.append("                <td>").append(container.getMemMaxAbs()).append("</td>\n");
                 sumMemAbsUse += container.getMemMaxAbs();
                 
+                // Время старта (один столбец на деплоймент, rowspan)
+                if (isFirstRow) {
+                    long startSec = deployment.getStartTime();
+                    String startClass = getStartTimeColorClass(startSec);
+                    html.append("                <td rowspan=\"").append(containerCount).append("\" class=\"").append(startClass).append("\">")
+                        .append(startSec).append(" с</td>\n");
+                }
+                
                 html.append("            </tr>\n");
                 isFirstRow = false;
                 totalContainers++;
@@ -183,6 +220,7 @@ public class HtmlTableService {
         html.append("                <td>").append(Math.round((double)sumMemMaxUse / totalContainers)).append("%</td>\n");
         html.append("                <td>").append(Math.round((double)sumMemAvgUse / totalContainers)).append("%</td>\n");
         html.append("                <td>").append(sumMemAbsUse).append("</td>\n");
+        html.append("                <td>—</td>\n");
         html.append("            </tr>\n");
         
         html.append("        </tbody>\n");
@@ -193,6 +231,14 @@ public class HtmlTableService {
         return html.toString();
     }
     
+    private void appendTd(StringBuilder html, long value, String cssClass) {
+        if (cssClass != null && !cssClass.isEmpty()) {
+            html.append("                <td class=\"").append(cssClass).append("\">").append(value).append("</td>\n");
+        } else {
+            html.append("                <td>").append(value).append("</td>\n");
+        }
+    }
+
     private String getCpuColorClass(int percent) {
         if (percent >= 60 && percent <= 79) {
             return "cpu-green";
@@ -214,6 +260,19 @@ public class HtmlTableService {
             return "mem-red-light"; // 0-19% - очень низкая утилизация
         } else {
             return "mem-red-dark"; // >= 80% - критически высокая утилизация (включая > 100%)
+        }
+    }
+
+    /** Цвет по времени старта (секунды): до 1 мин — зелёный, 1м1с–1.5 мин — желтоватый, 1.5–2 мин — оранжевый, >2 мин — красный (приглушённые цвета). */
+    private String getStartTimeColorClass(long seconds) {
+        if (seconds <= 60) {
+            return "start-green";
+        } else if (seconds <= 90) {
+            return "start-yellow";
+        } else if (seconds <= 120) {
+            return "start-orange";
+        } else {
+            return "start-red";
         }
     }
 }

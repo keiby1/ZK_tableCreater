@@ -14,6 +14,8 @@ import java.util.LinkedList;
 public class Deployment {
     String name;
     int podCount;
+    /** Время старта пода в секундах */
+    long startTime;
 
     LinkedList<Container> containers = new LinkedList<>();
 }
