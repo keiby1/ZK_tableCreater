@@ -59,9 +59,18 @@ public class HtmlComparisonService {
         html.append("        tr:hover {\n");
         html.append("            background-color: #f0f0f0;\n");
         html.append("        }\n");
-        html.append("        .diff-green { background-color: #90EE90; }\n");
-        html.append("        .diff-yellow { background-color: #FFD700; }\n");
-        html.append("        .diff-red { background-color: #FFB6C1; }\n");
+        html.append("        .diff-green { background-color: #c8e6c9; }\n");
+        html.append("        .diff-yellow { background-color: #fff9c4; }\n");
+        html.append("        .diff-red { background-color: #ffcdd2; }\n");
+        html.append("        .legend { margin-bottom: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 0.9em; }\n");
+        html.append("        .legend h3 { margin: 0 0 8px 0; font-size: 1em; color: #424242; }\n");
+        html.append("        .legend ul { margin: 4px 0 0 0; padding-left: 20px; }\n");
+        html.append("        .legend li { margin: 2px 0; }\n");
+        html.append("        .legend .swatch { display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: middle; border: 1px solid #bdbdbd; border-radius: 2px; }\n");
+        html.append("        .legend details summary { cursor: pointer; font-weight: bold; font-size: 1em; color: #424242; list-style: none; }\n");
+        html.append("        .legend details summary::-webkit-details-marker { display: none; }\n");
+        html.append("        .legend details summary::before { content: '▶ '; font-size: 0.75em; }\n");
+        html.append("        .legend details[open] summary::before { content: '▼ '; }\n");
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
@@ -69,6 +78,16 @@ public class HtmlComparisonService {
         html.append("        <h2>Сравнение: ").append(escapeHtml(name1)).append(" и ").append(escapeHtml(name2)).append("</h2>\n");
         html.append("        <p><strong>Слева</strong> — данные из первого файла (<em>").append(escapeHtml(name1)).append("</em>).</p>\n");
         html.append("        <p><strong>Справа</strong> — разница в скобках указана относительно второго файла (<em>").append(escapeHtml(name2)).append("</em>).</p>\n");
+        html.append("    </div>\n");
+        html.append("    <div class=\"legend\">\n");
+        html.append("        <details>\n");
+        html.append("            <summary>Расшифровка индикаторов</summary>\n");
+        html.append("            <ul>\n");
+        html.append("                <li><span class=\"swatch\" style=\"background:#c8e6c9\"></span> Разница отрицательная (значение уменьшилось)</li>\n");
+        html.append("                <li><span class=\"swatch\" style=\"background:#fff9c4\"></span> Без изменений (разница 0)</li>\n");
+        html.append("                <li><span class=\"swatch\" style=\"background:#ffcdd2\"></span> Разница положительная (значение увеличилось)</li>\n");
+        html.append("            </ul>\n");
+        html.append("        </details>\n");
         html.append("    </div>\n");
         html.append("    <table>\n");
         
