@@ -5,6 +5,7 @@ import com.example.demo.DTO.Deployment;
 import com.example.demo.Services.HtmlComparisonService;
 import com.example.demo.Services.HtmlParserService;
 import com.example.demo.Services.HtmlTableService;
+import com.example.demo.Services.VictoriaMetricsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,9 @@ public class MainController {
     
     @Autowired
     private HtmlComparisonService htmlComparisonService;
+
+    @Autowired
+    private VictoriaMetricsService victoriaMetricsService;
     
     @RequestMapping("/ping")
     public String test(){
@@ -61,14 +65,27 @@ public class MainController {
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
     
+    /**
+     * Таблица деплойментов: из метрик VictoriaMetrics (useMetrics=true) или тестовые данные.
+     * @param useMetrics true — брать данные из VictoriaMetrics
+     * @param namespace  фильтр по namespace (для useMetrics=true); из Grafana можно не передавать — тогда все неймспейсы
+     * @param from       начало интервала (UTC, мс, Unix); из Grafana: ${__from}
+     * @param to         конец интервала (UTC, мс, Unix); из Grafana: ${__to}
+     */
     @GetMapping("/get")
-    public ResponseEntity<String> get() {
-        List<Deployment> deployments = generateTestData();
+    public ResponseEntity<String> get(
+            @RequestParam(name = "useMetrics", defaultValue = "false") boolean useMetrics,
+            @RequestParam(name = "namespace", required = false) String namespace,
+            @RequestParam(name = "from", required = false) Long from,
+            @RequestParam(name = "to", required = false) Long to) {
+        List<Deployment> deployments = useMetrics
+                ? victoriaMetricsService.fetchDeployments(namespace, from, to)
+                : generateTestData();
         String html = htmlTableService.generateHtmlTable(deployments);
-        
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
-        
+
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
     
