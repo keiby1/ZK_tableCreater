@@ -4,6 +4,9 @@ import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -12,7 +15,19 @@ public class HtmlTableService {
     private static final int MAX_CPU_PER_DEPLOYMENT = 4000;
     private static final int MAX_RAM_PER_DEPLOYMENT = 10000;
 
+    private static final DateTimeFormatter INTERVAL_FORMAT =
+            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss").withZone(ZoneId.of("UTC"));
+
     public String generateHtmlTable(List<Deployment> deployments) {
+        return generateHtmlTable(deployments, null, null);
+    }
+
+    /**
+     * Генерирует HTML таблицу с опциональным блоком интервала выгрузки (между расшифровкой и таблицей).
+     * @param from начало интервала (UTC, мс) или null
+     * @param to   конец интервала (UTC, мс) или null
+     */
+    public String generateHtmlTable(List<Deployment> deployments, Long from, Long to) {
         StringBuilder html = new StringBuilder();
         
         html.append("<!DOCTYPE html>\n");
@@ -72,6 +87,7 @@ public class HtmlTableService {
         html.append("        .legend details summary::-webkit-details-marker { display: none; }\n");
         html.append("        .legend details summary::before { content: '▶ '; font-size: 0.75em; }\n");
         html.append("        .legend details[open] summary::before { content: '▼ '; }\n");
+        html.append("        .interval-info { margin-bottom: 16px; padding: 10px 16px; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px; font-size: 0.95em; color: #1565c0; }\n");
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
@@ -90,6 +106,9 @@ public class HtmlTableService {
         html.append("                <li><span class=\"swatch\" style=\"background:#ffcdd2\"></span> Время старта: более 2 мин</li>\n");
         html.append("            </ul>\n");
         html.append("        </details>\n");
+        html.append("    </div>\n");
+        html.append("    <div class=\"interval-info\">\n");
+        html.append("        Интервал выгрузки: ").append(formatInterval(from, to)).append("\n");
         html.append("    </div>\n");
         html.append("    <table>\n");
         
@@ -254,6 +273,15 @@ public class HtmlTableService {
         html.append("</html>\n");
         
         return html.toString();
+    }
+
+    private String formatInterval(Long from, Long to) {
+        if (from != null && to != null) {
+            String fromStr = INTERVAL_FORMAT.format(Instant.ofEpochMilli(from));
+            String toStr = INTERVAL_FORMAT.format(Instant.ofEpochMilli(to));
+            return "с " + fromStr + " по " + toStr + " (UTC)";
+        }
+        return "не указан";
     }
     
     private void appendTd(StringBuilder html, long value, String cssClass) {

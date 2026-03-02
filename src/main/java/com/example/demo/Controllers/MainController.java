@@ -81,7 +81,7 @@ public class MainController {
         List<Deployment> deployments = useMetrics
                 ? victoriaMetricsService.fetchDeployments(namespace, from, to)
                 : generateTestData();
-        String html = htmlTableService.generateHtmlTable(deployments);
+        String html = htmlTableService.generateHtmlTable(deployments, from, to);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
