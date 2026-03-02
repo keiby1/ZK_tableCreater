@@ -16,6 +16,8 @@ public class Deployment {
     int podCount;
     /** Время старта пода в секундах */
     long startTime;
+    /** Тип workload: "Deployment" или "StatefulSet" */
+    String workloadType = "Deployment";
 
     LinkedList<Container> containers = new LinkedList<>();
 }

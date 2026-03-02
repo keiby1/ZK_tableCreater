@@ -18,6 +18,7 @@ public class VictoriaMetricsService {
 
     private static final String LABEL_NAMESPACE = "namespace";
     private static final String LABEL_DEPLOYMENT = "deployment";
+    private static final String LABEL_STATEFULSET = "statefulset";
     private static final String LABEL_POD = "pod";
     private static final String LABEL_CONTAINER = "container";
     private static final String LABEL_OWNER_NAME = "owner_name";
@@ -46,13 +47,16 @@ public class VictoriaMetricsService {
             evaluationTimeSec = toMs / 1000;
         }
 
-        // 1) Деплойменты и количество подов
+        // 1) Деплойменты и StatefulSet'ы — количество подов
         Map<String, Integer> deploymentReplicas = queryDeploymentReplicas(namespace, evaluationTimeSec);
+        Map<String, Integer> statefulSetReplicas = queryStatefulSetReplicas(namespace, evaluationTimeSec);
 
-        // 2) Маппинг pod -> deployment (через ReplicaSet)
+        // 2) Маппинг pod -> deployment (через ReplicaSet) и pod -> statefulset
         Map<String, String> podToDeployment = queryPodToDeployment(namespace, evaluationTimeSec);
+        Map<String, String> podToStatefulSet = queryPodToStatefulSet(namespace, evaluationTimeSec);
 
-        if (podToDeployment.isEmpty() && deploymentReplicas.isEmpty()) {
+        if (podToDeployment.isEmpty() && deploymentReplicas.isEmpty()
+                && podToStatefulSet.isEmpty() && statefulSetReplicas.isEmpty()) {
             return List.of();
         }
 
@@ -62,53 +66,78 @@ public class VictoriaMetricsService {
         // 4) Утилизация CPU и памяти (avg/max за период)
         Map<ContainerKey, UsageValues> usage = queryContainerUsage(range, namespace, evaluationTimeSec);
 
-        // 5) Собираем деплойменты: по (namespace, deployment)
+        // 5) Собираем деплойменты и стейтфулсеты
+        List<Deployment> result = new ArrayList<>();
+
+        // Деплойменты
         Map<DeploymentKey, List<ContainerKey>> deploymentToContainers = new HashMap<>();
         for (ContainerKey ck : resources.keySet()) {
             String dep = podToDeployment.get(ck.namespace + "/" + ck.pod);
-            if (dep == null) {
-                // Fallback: если есть лейбл deployment в метриках контейнера — используем его
-                continue;
-            }
+            if (dep == null) continue;
             DeploymentKey dk = new DeploymentKey(ck.namespace, dep);
             deploymentToContainers.computeIfAbsent(dk, k -> new ArrayList<>()).add(ck);
         }
-
-        // Также добавляем деплойменты из replica count, у которых может не быть контейнеров в resources (если поды не найдены по owner)
         for (String nsAndDep : deploymentReplicas.keySet()) {
             String[] parts = nsAndDep.split("/", 2);
             if (parts.length != 2) continue;
             deploymentToContainers.putIfAbsent(new DeploymentKey(parts[0], parts[1]), new ArrayList<>());
         }
-
-        List<Deployment> result = new ArrayList<>();
         for (Map.Entry<DeploymentKey, List<ContainerKey>> e : deploymentToContainers.entrySet()) {
             DeploymentKey dk = e.getKey();
             int podCount = deploymentReplicas.getOrDefault(dk.namespace + "/" + dk.deploymentName, 0);
             if (podCount == 0) continue;
-
-            Deployment deployment = new Deployment();
-            deployment.setName(dk.deploymentName);
-            deployment.setPodCount(podCount);
-            deployment.setStartTime(0L);
-            deployment.setContainers(new LinkedList<>());
-
-            // Группируем по имени контейнера (один контейнер может быть в нескольких подах)
-            Map<String, List<ContainerKey>> byContainer = e.getValue().stream()
-                    .collect(Collectors.groupingBy(ck -> ck.container));
-
-            for (Map.Entry<String, List<ContainerKey>> ce : byContainer.entrySet()) {
-                Container container = buildContainer(ce.getKey(), ce.getValue(), resources, usage);
-                deployment.getContainers().add(container);
-            }
-
-            if (!deployment.getContainers().isEmpty()) {
+            Deployment deployment = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage);
+            if (deployment != null) {
+                deployment.setWorkloadType("Deployment");
                 result.add(deployment);
             }
         }
 
-        result.sort(Comparator.comparing(Deployment::getName));
+        // StatefulSet'ы
+        Map<DeploymentKey, List<ContainerKey>> statefulSetToContainers = new HashMap<>();
+        for (ContainerKey ck : resources.keySet()) {
+            String sts = podToStatefulSet.get(ck.namespace + "/" + ck.pod);
+            if (sts == null) continue;
+            DeploymentKey dk = new DeploymentKey(ck.namespace, sts);
+            statefulSetToContainers.computeIfAbsent(dk, k -> new ArrayList<>()).add(ck);
+        }
+        for (String nsAndSts : statefulSetReplicas.keySet()) {
+            String[] parts = nsAndSts.split("/", 2);
+            if (parts.length != 2) continue;
+            statefulSetToContainers.putIfAbsent(new DeploymentKey(parts[0], parts[1]), new ArrayList<>());
+        }
+        for (Map.Entry<DeploymentKey, List<ContainerKey>> e : statefulSetToContainers.entrySet()) {
+            DeploymentKey dk = e.getKey();
+            int podCount = statefulSetReplicas.getOrDefault(dk.namespace + "/" + dk.deploymentName, 0);
+            if (podCount == 0) continue;
+            Deployment statefulSet = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage);
+            if (statefulSet != null) {
+                statefulSet.setWorkloadType("StatefulSet");
+                result.add(statefulSet);
+            }
+        }
+
+        result.sort(Comparator.comparing(Deployment::getWorkloadType).thenComparing(Deployment::getName));
         return result;
+    }
+
+    private Deployment buildWorkload(String name, int podCount, List<ContainerKey> containerKeys,
+                                     Map<ContainerKey, ResourceValues> resources,
+                                     Map<ContainerKey, UsageValues> usage) {
+        Deployment deployment = new Deployment();
+        deployment.setName(name);
+        deployment.setPodCount(podCount);
+        deployment.setStartTime(0L);
+        deployment.setContainers(new LinkedList<>());
+
+        Map<String, List<ContainerKey>> byContainer = containerKeys.stream()
+                .collect(Collectors.groupingBy(ck -> ck.container));
+        for (Map.Entry<String, List<ContainerKey>> ce : byContainer.entrySet()) {
+            Container container = buildContainer(ce.getKey(), ce.getValue(), resources, usage);
+            deployment.getContainers().add(container);
+        }
+        if (deployment.getContainers().isEmpty()) return null;
+        return deployment;
     }
 
     /** Добавить фильтр по namespace в PromQL (selector). */
@@ -184,6 +213,41 @@ public class VictoriaMetricsService {
             }
         }
         return podToDeployment;
+    }
+
+    private Map<String, Integer> queryStatefulSetReplicas(String namespace, Long evaluationTimeSec) {
+        String query = addNamespaceFilter("kube_statefulset_status_replicas_ready", namespace);
+        PrometheusResponse resp = client.query(query, evaluationTimeSec);
+        Map<String, Integer> out = new HashMap<>();
+        if (resp == null || resp.getData() == null || resp.getData().getResult() == null) return out;
+        for (PrometheusResponse.Result r : resp.getData().getResult()) {
+            String ns = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_NAMESPACE);
+            String sts = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_STATEFULSET);
+            if (ns == null || sts == null) continue;
+            double v = VictoriaMetricsClient.parseValue(r.getValue());
+            if (!Double.isNaN(v)) {
+                out.put(ns + "/" + sts, (int) Math.round(v));
+            }
+        }
+        return out;
+    }
+
+    private Map<String, String> queryPodToStatefulSet(String namespace, Long evaluationTimeSec) {
+        String qPod = addNamespaceFilter("kube_pod_owner{owner_kind=\"StatefulSet\"}", namespace);
+        PrometheusResponse respPod = client.query(qPod, evaluationTimeSec);
+        Map<String, String> podToStatefulSet = new HashMap<>();
+        if (respPod == null || respPod.getData() == null || respPod.getData().getResult() == null) {
+            return podToStatefulSet;
+        }
+        for (PrometheusResponse.Result r : respPod.getData().getResult()) {
+            String ns = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_NAMESPACE);
+            String pod = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_POD);
+            String sts = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_OWNER_NAME);
+            if (ns != null && pod != null && sts != null) {
+                podToStatefulSet.put(ns + "/" + pod, sts);
+            }
+        }
+        return podToStatefulSet;
     }
 
     private Map<ContainerKey, ResourceValues> queryContainerResources(String namespace, Long evaluationTimeSec) {

@@ -116,7 +116,7 @@ public class HtmlTableService {
         html.append("        <thead>\n");
         html.append("            <tr>\n");
         html.append("                <th>Количество подов</th>\n");
-        html.append("                <th>Deployment</th>\n");
+        html.append("                <th>Workload</th>\n");
         html.append("                <th>Container</th>\n");
         html.append("                <th>CpuLim</th>\n");
         html.append("                <th>CpuRq</th>\n");
@@ -179,8 +179,7 @@ public class HtmlTableService {
                     html.append("                <td rowspan=\"").append(containerCount).append("\">")
                         .append(deployment.getPodCount()).append("</td>\n");
                 }
-                
-                // Название пода (rowspan только для первой строки)
+                // Название workload (rowspan только для первой строки)
                 if (isFirstRow) {
                     html.append("                <td rowspan=\"").append(containerCount).append("\">")
                         .append(deployment.getName()).append("</td>\n");

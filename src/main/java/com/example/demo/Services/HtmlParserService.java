@@ -32,32 +32,24 @@ public class HtmlParserService {
         String currentDeploymentName = null;
         int currentPodCount = 0;
         Deployment currentDeployment = null;
-        int cellOffset = 0; // Смещение для ячеек (0 если есть rowspan, 2 если нет)
+        int cellOffset = 0;
         
         while (trMatcher.find()) {
             String row = trMatcher.group(1);
             
-            // Проверяем, есть ли rowspan в первой ячейке (количество подов)
             Pattern rowspanPattern = Pattern.compile("rowspan=\"(\\d+)\"");
             Matcher rowspanMatcher = rowspanPattern.matcher(row);
-            
             boolean hasRowspan = rowspanMatcher.find();
             
-            // Извлекаем все td элементы
             Pattern tdPattern = Pattern.compile("<td[^>]*>(.*?)</td>", Pattern.DOTALL);
             Matcher tdMatcher = tdPattern.matcher(row);
-            
             List<String> cells = new LinkedList<>();
             while (tdMatcher.find()) {
-                String cellContent = tdMatcher.group(1).trim();
-                cells.add(cellContent);
+                cells.add(tdMatcher.group(1).trim());
             }
             
             if (hasRowspan) {
-                // Поддержка старого формата (13 ячеек) и нового (14 ячеек с «Время старта»)
-                if (cells.size() < 13) {
-                    continue;
-                }
+                if (cells.size() < 13) continue;
                 currentPodCount = parseInt(cells.get(0));
                 currentDeploymentName = cells.get(1);
                 currentDeployment = new Deployment();
@@ -69,29 +61,23 @@ public class HtmlParserService {
                 cellOffset = 0;
             } else {
                 cellOffset = 2;
-                if (cells.size() < 11) {
-                    continue;
-                }
+                if (cells.size() < 11) continue;
             }
             
-            if (currentDeployment == null || cells.size() < 13 - cellOffset) {
-                continue;
-            }
+            if (currentDeployment == null || cells.size() < 13 - cellOffset) continue;
             
-            // Создаем контейнер из текущей строки
             Container container = new Container();
-            container.setName(cells.get(2 - cellOffset)); // Название контейнера
-            container.setCpuLim(parseInt(cells.get(3 - cellOffset))); // ЦПУ лимиты
-            container.setCpuRq(parseInt(cells.get(4 - cellOffset))); // ЦПУ реквесты
-            container.setMemLim(parseInt(cells.get(5 - cellOffset))); // Память лимиты
-            container.setMemRq(parseInt(cells.get(6 - cellOffset))); // Память реквесты
-            container.setCpuMaxPercent(parseInt(cells.get(7 - cellOffset))); // ЦПУ утилизация макс
-            container.setCpuAvgPercent(parseInt(cells.get(8 - cellOffset))); // ЦПУ утилизация сред
-            container.setCpuMaxAbs(parseInt(cells.get(9 - cellOffset))); // ЦПУ утилизация абс
-            container.setMemMaxPercent(parseInt(cells.get(10 - cellOffset))); // Утилизация памяти макс
-            container.setMemAvgPercent(parseInt(cells.get(11 - cellOffset))); // Утилизация памяти сред
-            container.setMemMaxAbs(parseInt(cells.get(12 - cellOffset))); // Утилизация памяти абс
-            
+            container.setName(cells.get(2 - cellOffset));
+            container.setCpuLim(parseInt(cells.get(3 - cellOffset)));
+            container.setCpuRq(parseInt(cells.get(4 - cellOffset)));
+            container.setMemLim(parseInt(cells.get(5 - cellOffset)));
+            container.setMemRq(parseInt(cells.get(6 - cellOffset)));
+            container.setCpuMaxPercent(parseInt(cells.get(7 - cellOffset)));
+            container.setCpuAvgPercent(parseInt(cells.get(8 - cellOffset)));
+            container.setCpuMaxAbs(parseInt(cells.get(9 - cellOffset)));
+            container.setMemMaxPercent(parseInt(cells.get(10 - cellOffset)));
+            container.setMemAvgPercent(parseInt(cells.get(11 - cellOffset)));
+            container.setMemMaxAbs(parseInt(cells.get(12 - cellOffset)));
             currentDeployment.getContainers().add(container);
         }
         
