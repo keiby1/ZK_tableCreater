@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 
 /**
  * Сбор метрик из VictoriaMetrics (OpenShift) и маппинг в DTO Deployment/Container.
- * Время старта не заполняется (метрики в готовом виде нет).
+ * Время старта пода: kube_pod_start_time − kube_pod_created; если в кластере они совпадают (оба = creationTimestamp), будет 0.
  */
 @Service
 public class VictoriaMetricsService {
@@ -66,6 +66,9 @@ public class VictoriaMetricsService {
         // 4) Утилизация CPU и памяти (avg/max за период)
         Map<ContainerKey, UsageValues> usage = queryContainerUsage(range, namespace, evaluationTimeSec);
 
+        // 4.5) Время старта пода (сек): kube_pod_start_time - kube_pod_created по каждому поду
+        Map<String, Long> podStartupSeconds = queryPodStartupSeconds(namespace, evaluationTimeSec);
+
         // 5) Собираем деплойменты и стейтфулсеты
         List<Deployment> result = new ArrayList<>();
 
@@ -86,7 +89,7 @@ public class VictoriaMetricsService {
             DeploymentKey dk = e.getKey();
             int podCount = deploymentReplicas.getOrDefault(dk.namespace + "/" + dk.deploymentName, 0);
             if (podCount == 0) continue;
-            Deployment deployment = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage);
+            Deployment deployment = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage, podStartupSeconds);
             if (deployment != null) {
                 deployment.setWorkloadType("Deployment");
                 result.add(deployment);
@@ -110,7 +113,7 @@ public class VictoriaMetricsService {
             DeploymentKey dk = e.getKey();
             int podCount = statefulSetReplicas.getOrDefault(dk.namespace + "/" + dk.deploymentName, 0);
             if (podCount == 0) continue;
-            Deployment statefulSet = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage);
+            Deployment statefulSet = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage, podStartupSeconds);
             if (statefulSet != null) {
                 statefulSet.setWorkloadType("StatefulSet");
                 result.add(statefulSet);
@@ -123,11 +126,18 @@ public class VictoriaMetricsService {
 
     private Deployment buildWorkload(String name, int podCount, List<ContainerKey> containerKeys,
                                      Map<ContainerKey, ResourceValues> resources,
-                                     Map<ContainerKey, UsageValues> usage) {
+                                     Map<ContainerKey, UsageValues> usage,
+                                     Map<String, Long> podStartupSeconds) {
         Deployment deployment = new Deployment();
         deployment.setName(name);
         deployment.setPodCount(podCount);
-        deployment.setStartTime(0L);
+        long startTimeSec = containerKeys.stream()
+                .map(ck -> ck.namespace + "/" + ck.pod)
+                .distinct()
+                .mapToLong(podKey -> podStartupSeconds.getOrDefault(podKey, 0L))
+                .max()
+                .orElse(0L);
+        deployment.setStartTime(startTimeSec);
         deployment.setContainers(new LinkedList<>());
 
         Map<String, List<ContainerKey>> byContainer = containerKeys.stream()
@@ -228,6 +238,48 @@ public class VictoriaMetricsService {
             if (!Double.isNaN(v)) {
                 out.put(ns + "/" + sts, (int) Math.round(v));
             }
+        }
+        return out;
+    }
+
+    /**
+     * Время старта пода в секундах: kube_pod_start_time − kube_pod_created по каждому поду.
+     * Если в кластере обе метрики равны (например, оба = creationTimestamp), результат будет 0.
+     * Ключ мапы: "namespace/pod".
+     */
+    private Map<String, Long> queryPodStartupSeconds(String namespace, Long evaluationTimeSec) {
+        Map<String, Double> startTime = new HashMap<>();
+        Map<String, Double> created = new HashMap<>();
+        String qStart = addNamespaceFilter("kube_pod_start_time", namespace);
+        String qCreated = addNamespaceFilter("kube_pod_created", namespace);
+        PrometheusResponse respStart = client.query(qStart, evaluationTimeSec);
+        PrometheusResponse respCreated = client.query(qCreated, evaluationTimeSec);
+        if (respStart != null && respStart.getData() != null && respStart.getData().getResult() != null) {
+            for (PrometheusResponse.Result r : respStart.getData().getResult()) {
+                String ns = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_NAMESPACE);
+                String pod = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_POD);
+                if (ns != null && pod != null) {
+                    double v = VictoriaMetricsClient.parseValue(r.getValue());
+                    if (!Double.isNaN(v)) startTime.put(ns + "/" + pod, v);
+                }
+            }
+        }
+        if (respCreated != null && respCreated.getData() != null && respCreated.getData().getResult() != null) {
+            for (PrometheusResponse.Result r : respCreated.getData().getResult()) {
+                String ns = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_NAMESPACE);
+                String pod = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_POD);
+                if (ns != null && pod != null) {
+                    double v = VictoriaMetricsClient.parseValue(r.getValue());
+                    if (!Double.isNaN(v)) created.put(ns + "/" + pod, v);
+                }
+            }
+        }
+        Map<String, Long> out = new HashMap<>();
+        for (String key : startTime.keySet()) {
+            Double c = created.get(key);
+            if (c == null) continue;
+            double diff = startTime.get(key) - c;
+            out.put(key, (long) Math.max(0, Math.round(diff)));
         }
         return out;
     }
