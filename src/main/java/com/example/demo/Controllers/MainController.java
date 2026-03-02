@@ -18,15 +18,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Scanner;
 
 @RestController
 public class MainController {
@@ -53,15 +48,16 @@ public class MainController {
         return new ResponseEntity<>("Утилита для получения информации о ресурсах и их утилизации в ДА для ЗелКора", HttpStatus.OK);
     }
     
+    /** Возвращает HTML-таблицу для скачивания (attachment). */
     @GetMapping("/getHtml")
     public ResponseEntity<String> getHtml() {
         List<Deployment> deployments = generateTestData();
         String html = htmlTableService.generateHtmlTable(deployments);
-        
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
         headers.setContentDispositionFormData("attachment", "deployment_table.html");
-        
+
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
     
@@ -85,52 +81,117 @@ public class MainController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
+        // без Content-Disposition — страница отображается в браузере
 
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
-    
-    @RequestMapping("/compare")
-    public ResponseEntity<String> compareHtmlFiles(
-//            @RequestParam("file1") MultipartFile file1,
-//            @RequestParam("file2") MultipartFile file2
-    ) {
-        //            URL resource1 = MainController.class.getClassLoader().getResource("deployment_table (1).html");
-//            URL resource2 = MainController.class.getClassLoader().getResource("deployment_table (2).html");
-//            File file1 = new File(resource1.toURI());
-//            File file2 = new File(resource2.toURI());
-        String html1 = "";
-        String html2 = "";
-        try (InputStream is = MainController.class.getClassLoader().getResourceAsStream("deployment_table (1).html")) {
-            if (is != null) {
-                html1 = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
-            }
-        } catch (Exception e) {
-            // ресурс не найден или ошибка чтения
-        }
-        try (InputStream is = MainController.class.getClassLoader().getResourceAsStream("deployment_table (2).html")) {
-            if (is != null) {
-                html2 = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
-            }
-        } catch (Exception e) {
-            // ресурс не найден или ошибка чтения
-        }
 
-        // Читаем содержимое файлов
-//            String html1 = new String(file1, StandardCharsets.UTF_8);
-//            String html2 = new String(file2.toString(), StandardCharsets.UTF_8);
-
-        // Парсим HTML таблицы
-        List<Deployment> deployments1 = htmlParserService.parseHtmlTable(html1);
-        List<Deployment> deployments2 = htmlParserService.parseHtmlTable(html2);
-
-        String file1Name = "deployment_table (1).html";
-        String file2Name = "deployment_table (2).html";
-        String comparisonHtml = htmlComparisonService.generateComparisonTable(deployments1, deployments2, file1Name, file2Name);
-
+    /**
+     * GET /compare — страница с формой: два поля для выбора файлов (drag-drop и кнопки), затем отправка на POST /compare.
+     */
+    @GetMapping("/compare")
+    public ResponseEntity<String> comparePage() {
+        String html = buildCompareUploadPage();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
+        return new ResponseEntity<>(html, headers, HttpStatus.OK);
+    }
 
+    /**
+     * POST /compare — приём двух HTML-файлов таблиц, парсинг и возврат страницы с результатом сравнения.
+     */
+    @PostMapping(value = "/compare", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> compareSubmit(
+            @RequestParam("file1") MultipartFile file1,
+            @RequestParam("file2") MultipartFile file2) {
+        String file1Name = file1.getOriginalFilename() != null ? file1.getOriginalFilename() : "Файл 1";
+        String file2Name = file2.getOriginalFilename() != null ? file2.getOriginalFilename() : "Файл 2";
+        String html1;
+        String html2;
+        try {
+            html1 = new String(file1.getBytes(), StandardCharsets.UTF_8);
+            html2 = new String(file2.getBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            HttpHeaders errHeaders = new HttpHeaders();
+            errHeaders.setContentType(MediaType.TEXT_HTML);
+            String errorPage = buildCompareUploadPage()
+                    + "<div style=\"margin:20px;padding:16px;background:#ffebee;border:1px solid #ef9a9a;border-radius:6px;\">"
+                    + "Ошибка чтения файлов: " + e.getMessage() + "</div></body></html>";
+            return new ResponseEntity<>(errorPage, errHeaders, HttpStatus.OK);
+        }
+        List<Deployment> deployments1 = htmlParserService.parseHtmlTable(html1);
+        List<Deployment> deployments2 = htmlParserService.parseHtmlTable(html2);
+        String comparisonHtml = htmlComparisonService.generateComparisonTable(deployments1, deployments2, file1Name, file2Name);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
         return new ResponseEntity<>(comparisonHtml, headers, HttpStatus.OK);
+    }
+
+    private String buildCompareUploadPage() {
+        return "<!DOCTYPE html>\n"
+                + "<html lang=\"ru\">\n"
+                + "<head>\n"
+                + "  <meta charset=\"UTF-8\">\n"
+                + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+                + "  <title>Сравнение таблиц</title>\n"
+                + "  <style>\n"
+                + "    body { font-family: Arial, sans-serif; margin: 24px; background: #f5f5f5; }\n"
+                + "    h1 { color: #2e7d32; margin-bottom: 8px; }\n"
+                + "    .upload-zone { border: 2px dashed #9e9e9e; border-radius: 8px; padding: 24px; margin: 12px 0; background: #fafafa; min-height: 80px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s, border-color .2s; }\n"
+                + "    .upload-zone:hover, .upload-zone.dragover { background: #e8f5e9; border-color: #4CAF50; }\n"
+                + "    .upload-zone input[type=file] { display: none; }\n"
+                + "    .upload-zone .label { color: #616161; }\n"
+                + "    .upload-zone.has-file .label { color: #2e7d32; font-weight: bold; }\n"
+                + "    form { max-width: 600px; }\n"
+                + "    .btn { margin-top: 16px; padding: 12px 24px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1em; }\n"
+                + "    .btn:hover { background: #43A047; }\n"
+                + "    .btn:disabled { background: #9e9e9e; cursor: not-allowed; }\n"
+                + "    .hint { font-size: 0.9em; color: #757575; margin-top: 4px; }\n"
+                + "  </style>\n"
+                + "</head>\n"
+                + "<body>\n"
+                + "  <h1>Сравнение двух таблиц выгрузки</h1>\n"
+                + "  <p class=\"hint\">Выберите два HTML-файла таблиц (скачанных через /get или /getHtml). Перетащите файлы в зоны или нажмите для выбора.</p>\n"
+                + "  <form id=\"compareForm\" action=\"/compare\" method=\"post\" enctype=\"multipart/form-data\">\n"
+                + "    <div>\n"
+                + "      <label>Первый файл</label>\n"
+                + "      <div class=\"upload-zone\" id=\"zone1\" data-input=\"input1\">\n"
+                + "        <span class=\"label\" id=\"label1\">Перетащите файл сюда или нажмите для выбора</span>\n"
+                + "        <input type=\"file\" name=\"file1\" id=\"input1\" accept=\".html,.htm\">\n"
+                + "      </div>\n"
+                + "    </div>\n"
+                + "    <div>\n"
+                + "      <label>Второй файл</label>\n"
+                + "      <div class=\"upload-zone\" id=\"zone2\" data-input=\"input2\">\n"
+                + "        <span class=\"label\" id=\"label2\">Перетащите файл сюда или нажмите для выбора</span>\n"
+                + "        <input type=\"file\" name=\"file2\" id=\"input2\" accept=\".html,.htm\">\n"
+                + "      </div>\n"
+                + "    </div>\n"
+                + "    <button type=\"submit\" class=\"btn\" id=\"submitBtn\" disabled>Сравнить таблицы</button>\n"
+                + "  </form>\n"
+                + "  <script>\n"
+                + "    function setupZone(zoneId, inputId, labelId) {\n"
+                + "      var zone = document.getElementById(zoneId);\n"
+                + "      var input = document.getElementById(inputId);\n"
+                + "      var label = document.getElementById(labelId);\n"
+                + "      function setFile(f) {\n"
+                + "        if (f && f.name) { label.textContent = f.name; zone.classList.add('has-file'); } else { label.textContent = 'Перетащите файл сюда или нажмите для выбора'; zone.classList.remove('has-file'); }\n"
+                + "        updateSubmit();\n"
+                + "      }\n"
+                + "      zone.addEventListener('click', function() { input.click(); });\n"
+                + "      input.addEventListener('change', function() { setFile(input.files[0]); });\n"
+                + "      zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('dragover'); });\n"
+                + "      zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });\n"
+                + "      zone.addEventListener('drop', function(e) { e.preventDefault(); zone.classList.remove('dragover'); input.files = e.dataTransfer.files; setFile(input.files[0]); });\n"
+                + "    }\n"
+                + "    function updateSubmit() {\n"
+                + "      document.getElementById('submitBtn').disabled = !document.getElementById('input1').files.length || !document.getElementById('input2').files.length;\n"
+                + "    }\n"
+                + "    setupZone('zone1', 'input1', 'label1');\n"
+                + "    setupZone('zone2', 'input2', 'label2');\n"
+                + "  </script>\n"
+                + "</body>\n"
+                + "</html>";
     }
     
     private List<Deployment> generateTestData() {
