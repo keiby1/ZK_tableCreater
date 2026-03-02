@@ -48,11 +48,20 @@ public class MainController {
         return new ResponseEntity<>("Утилита для получения информации о ресурсах и их утилизации в ДА для ЗелКора", HttpStatus.OK);
     }
     
-    /** Возвращает HTML-таблицу для скачивания (attachment). */
+    /**
+     * Та же логика, что и /get (те же параметры, сбор данных, формирование HTML),
+     * но результат отдаётся как файл для скачивания (Content-Disposition: attachment).
+     */
     @GetMapping("/getHtml")
-    public ResponseEntity<String> getHtml() {
-        List<Deployment> deployments = generateTestData();
-        String html = htmlTableService.generateHtmlTable(deployments);
+    public ResponseEntity<String> getHtml(
+            @RequestParam(name = "useMetrics", defaultValue = "false") boolean useMetrics,
+            @RequestParam(name = "namespace", required = false) String namespace,
+            @RequestParam(name = "from", required = false) Long from,
+            @RequestParam(name = "to", required = false) Long to) {
+        List<Deployment> deployments = useMetrics
+                ? victoriaMetricsService.fetchDeployments(namespace, from, to)
+                : generateTestData();
+        String html = htmlTableService.generateHtmlTable(deployments, from, to);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
@@ -60,9 +69,10 @@ public class MainController {
 
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
-    
+
     /**
      * Таблица деплойментов: из метрик VictoriaMetrics (useMetrics=true) или тестовые данные.
+     * Результат отображается в браузере.
      * @param useMetrics true — брать данные из VictoriaMetrics
      * @param namespace  фильтр по namespace (для useMetrics=true); из Grafana можно не передавать — тогда все неймспейсы
      * @param from       начало интервала (UTC, мс, Unix); из Grafana: ${__from}
