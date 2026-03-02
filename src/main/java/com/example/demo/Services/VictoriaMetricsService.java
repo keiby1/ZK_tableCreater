@@ -292,17 +292,19 @@ public class VictoriaMetricsService {
 
     private Map<ContainerKey, UsageValues> queryContainerUsage(String range, String namespace, Long evaluationTimeSec) {
         Map<ContainerKey, UsageValues> out = new HashMap<>();
+        String step = config.getSubqueryStep();
+        String cpuWindow = config.getCpuRateWindow();
 
-        // CPU: rate в ядрах. Для avg/max за период используем агрегаты в PromQL.
+        // CPU: rate в ядрах. Окно rate и шаг подзапроса настраиваются для совпадения с Grafana.
         String cpuRate = addNamespaceFilter(
-                "rate(container_cpu_usage_seconds_total{container!=\"\", container!=\"POD\"}[5m])", namespace);
-        String qCpuAvg = "avg_over_time(" + cpuRate + "[" + range + ":5m])";
-        String qCpuMax = "max_over_time(" + cpuRate + "[" + range + ":5m])";
+                "rate(container_cpu_usage_seconds_total{container!=\"\", container!=\"POD\"}[" + cpuWindow + "])", namespace);
+        String qCpuAvg = "avg_over_time(" + cpuRate + "[" + range + ":" + step + "])";
+        String qCpuMax = "max_over_time(" + cpuRate + "[" + range + ":" + step + "])";
 
         String mem = addNamespaceFilter(
                 "container_memory_working_set_bytes{container!=\"\", container!=\"POD\"}", namespace);
-        String qMemAvg = "avg_over_time(" + mem + "[" + range + ":1m])";
-        String qMemMax = "max_over_time(" + mem + "[" + range + ":1m])";
+        String qMemAvg = "avg_over_time(" + mem + "[" + range + ":" + step + "])";
+        String qMemMax = "max_over_time(" + mem + "[" + range + ":" + step + "])";
 
         fillUsageMetric(out, qCpuAvg, (uv, v) -> uv.cpuAvgCores = v, evaluationTimeSec);
         fillUsageMetric(out, qCpuMax, (uv, v) -> uv.cpuMaxCores = v, evaluationTimeSec);
@@ -346,40 +348,69 @@ public class VictoriaMetricsService {
             c.setMemLim(0);
         }
 
-        // Утилизация: по контейнерам (несколько подов) — усредняем/максимум
-        double cpuAvgSum = 0, cpuMaxMax = 0, memAvgSum = 0, memMaxMax = 0;
-        int n = 0;
-        for (ContainerKey ck : keys) {
-            UsageValues uv = usage.get(ck);
-            if (uv == null) continue;
-            ResourceValues res = resources.get(ck);
-            double cpuLim = res != null ? res.cpuLimCores : 0;
-            double memLim = res != null ? res.memLimBytes : 0;
-
-            if (cpuLim <= 0) cpuLim = (res != null ? res.cpuRqCores : 0);
-            if (memLim <= 0) memLim = (res != null ? res.memRqBytes : 0);
-
-            double cpuAvgPct = toPercent(uv.cpuAvgCores, cpuLim);
-            double cpuMaxPct = toPercent(uv.cpuMaxCores, cpuLim);
-            double memAvgPct = toPercent(uv.memAvgBytes, memLim);
-            double memMaxPct = toPercent(uv.memMaxBytes, memLim);
-
-            cpuAvgSum += cpuAvgPct;
-            cpuMaxMax = Math.max(cpuMaxMax, cpuMaxPct);
-            memAvgSum += memAvgPct;
-            memMaxMax = Math.max(memMaxMax, memMaxPct);
-            n++;
-        }
-        if (n > 0) {
-            c.setCpuAvgPercent((int) Math.round(cpuAvgSum / n));
-            c.setCpuMaxPercent((int) Math.round(cpuMaxMax));
-            c.setMemAvgPercent((int) Math.round(memAvgSum / n));
-            c.setMemMaxPercent((int) Math.round(memMaxMax));
+        // Утилизация: по контейнерам (несколько подов). Метод из конфига: average_per_pod или sum_then_percent (как в Grafana).
+        boolean sumThenPercent = "sum_then_percent".equalsIgnoreCase(config.getAggregationMethod());
+        if (sumThenPercent) {
+            double sumCpuAvg = 0, sumMemAvg = 0, sumCpuLim = 0, sumMemLim = 0;
+            double cpuMaxPct = 0, memMaxPct = 0;
+            for (ContainerKey ck : keys) {
+                UsageValues uv = usage.get(ck);
+                ResourceValues res = resources.get(ck);
+                if (uv == null) continue;
+                double cpuLim = res != null ? res.cpuLimCores : 0;
+                double memLim = res != null ? res.memLimBytes : 0;
+                if (cpuLim <= 0) cpuLim = (res != null ? res.cpuRqCores : 0);
+                if (memLim <= 0) memLim = (res != null ? res.memRqBytes : 0);
+                sumCpuAvg += uv.cpuAvgCores;
+                sumMemAvg += uv.memAvgBytes;
+                sumCpuLim += cpuLim;
+                sumMemLim += memLim;
+                cpuMaxPct = Math.max(cpuMaxPct, toPercent(uv.cpuMaxCores, cpuLim));
+                memMaxPct = Math.max(memMaxPct, toPercent(uv.memMaxBytes, memLim));
+            }
+            if (sumCpuLim > 0 || sumMemLim > 0) {
+                c.setCpuAvgPercent((int) Math.round(toPercent(sumCpuAvg, sumCpuLim)));
+                c.setCpuMaxPercent((int) Math.round(cpuMaxPct));
+                c.setMemAvgPercent((int) Math.round(toPercent(sumMemAvg, sumMemLim)));
+                c.setMemMaxPercent((int) Math.round(memMaxPct));
+            } else {
+                c.setCpuAvgPercent(0);
+                c.setCpuMaxPercent(0);
+                c.setMemAvgPercent(0);
+                c.setMemMaxPercent(0);
+            }
         } else {
-            c.setCpuAvgPercent(0);
-            c.setCpuMaxPercent(0);
-            c.setMemAvgPercent(0);
-            c.setMemMaxPercent(0);
+            double cpuAvgSum = 0, cpuMaxMax = 0, memAvgSum = 0, memMaxMax = 0;
+            int n = 0;
+            for (ContainerKey ck : keys) {
+                UsageValues uv = usage.get(ck);
+                if (uv == null) continue;
+                ResourceValues res = resources.get(ck);
+                double cpuLim = res != null ? res.cpuLimCores : 0;
+                double memLim = res != null ? res.memLimBytes : 0;
+                if (cpuLim <= 0) cpuLim = (res != null ? res.cpuRqCores : 0);
+                if (memLim <= 0) memLim = (res != null ? res.memRqBytes : 0);
+                double cpuAvgPct = toPercent(uv.cpuAvgCores, cpuLim);
+                double cpuMaxPct = toPercent(uv.cpuMaxCores, cpuLim);
+                double memAvgPct = toPercent(uv.memAvgBytes, memLim);
+                double memMaxPct = toPercent(uv.memMaxBytes, memLim);
+                cpuAvgSum += cpuAvgPct;
+                cpuMaxMax = Math.max(cpuMaxMax, cpuMaxPct);
+                memAvgSum += memAvgPct;
+                memMaxMax = Math.max(memMaxMax, memMaxPct);
+                n++;
+            }
+            if (n > 0) {
+                c.setCpuAvgPercent((int) Math.round(cpuAvgSum / n));
+                c.setCpuMaxPercent((int) Math.round(cpuMaxMax));
+                c.setMemAvgPercent((int) Math.round(memAvgSum / n));
+                c.setMemMaxPercent((int) Math.round(memMaxMax));
+            } else {
+                c.setCpuAvgPercent(0);
+                c.setCpuMaxPercent(0);
+                c.setMemAvgPercent(0);
+                c.setMemMaxPercent(0);
+            }
         }
 
         // Абсолютные значения: макс использование в millicores и MB
