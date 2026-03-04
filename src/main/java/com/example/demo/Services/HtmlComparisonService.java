@@ -61,9 +61,8 @@ public class HtmlComparisonService {
         html.append("        tr:hover {\n");
         html.append("            background-color: #f0f0f0;\n");
         html.append("        }\n");
-        html.append("        .diff-green { background-color: #c8e6c9; }\n");
-        html.append("        .diff-yellow { background-color: #fff9c4; }\n");
-        html.append("        .diff-red { background-color: #ffcdd2; }\n");
+        html.append("        .diff-increased { background-color: #c8e6c9; }\n");
+        html.append("        .diff-decreased { background-color: #ffcdd2; }\n");
         html.append("        .legend { margin-bottom: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 0.9em; }\n");
         html.append("        .legend h3 { margin: 0 0 8px 0; font-size: 1em; color: #424242; }\n");
         html.append("        .legend ul { margin: 4px 0 0 0; padding-left: 20px; }\n");
@@ -78,16 +77,15 @@ public class HtmlComparisonService {
         html.append("<body>\n");
         html.append("    <div class=\"compare-header\">\n");
         html.append("        <h2>Сравнение: ").append(escapeHtml(name1)).append(" и ").append(escapeHtml(name2)).append("</h2>\n");
-        html.append("        <p><strong>Слева</strong> — данные из первого файла (<em>").append(escapeHtml(name1)).append("</em>).</p>\n");
-        html.append("        <p><strong>Справа</strong> — разница в скобках указана относительно второго файла (<em>").append(escapeHtml(name2)).append("</em>).</p>\n");
+        html.append("        <p>В ячейке: <strong>слева</strong> — значение из первого файла (<em>").append(escapeHtml(name1)).append("</em>), <strong>в скобках</strong> — из второго (<em>").append(escapeHtml(name2)).append("</em>).</p>\n");
         html.append("    </div>\n");
         html.append("    <div class=\"legend\">\n");
         html.append("        <details>\n");
         html.append("            <summary>Расшифровка индикаторов</summary>\n");
         html.append("            <ul>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#c8e6c9\"></span> Разница отрицательная (значение уменьшилось)</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#fff9c4\"></span> Без изменений (разница 0)</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#ffcdd2\"></span> Разница положительная (значение увеличилось)</li>\n");
+        html.append("                <li><span class=\"swatch\" style=\"background:#c8e6c9\"></span> Значение увеличилось (во 2-м файле больше)</li>\n");
+        html.append("                <li><span class=\"swatch\" style=\"background:#ffcdd2\"></span> Значение уменьшилось (во 2-м файле меньше)</li>\n");
+        html.append("                <li>Без заливки — не изменилось</li>\n");
         html.append("            </ul>\n");
         html.append("        </details>\n");
         html.append("    </div>\n");
@@ -157,50 +155,31 @@ public class HtmlComparisonService {
                 
                 html.append("                <td>").append(container1.getName()).append("</td>\n");
                 
-                // Порядок: CpuRq, CpuLim, MemRq, MemLim
-                int diffCpuRq = container2 != null ? container1.getCpuRq() - container2.getCpuRq() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffCpuRq)).append("\">")
-                    .append(container1.getCpuRq()).append(" (").append(formatDiff(diffCpuRq)).append(")</td>\n");
-                int diffCpuLim = container2 != null ? container1.getCpuLim() - container2.getCpuLim() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffCpuLim)).append("\">")
-                    .append(container1.getCpuLim()).append(" (").append(formatDiff(diffCpuLim)).append(")</td>\n");
-                int diffMemRq = container2 != null ? container1.getMemRq() - container2.getMemRq() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffMemRq)).append("\">")
-                    .append(container1.getMemRq()).append(" (").append(formatDiff(diffMemRq)).append(")</td>\n");
-                int diffMemLim = container2 != null ? container1.getMemLim() - container2.getMemLim() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffMemLim)).append("\">")
-                    .append(container1.getMemLim()).append(" (").append(formatDiff(diffMemLim)).append(")</td>\n");
+                // Формат: значение1 (значение2). Цвет: зелёный если значение2 > значение1, красный если меньше, без заливки если равно
+                appendCompareCell(html, container1.getCpuRq(), container2 != null ? container2.getCpuRq() : null, "");
+                appendCompareCell(html, container1.getCpuLim(), container2 != null ? container2.getCpuLim() : null, "");
+                appendCompareCell(html, container1.getMemRq(), container2 != null ? container2.getMemRq() : null, "");
+                appendCompareCell(html, container1.getMemLim(), container2 != null ? container2.getMemLim() : null, "");
+                appendCompareCell(html, container1.getCpuMaxPercent(), container2 != null ? container2.getCpuMaxPercent() : null, "%");
+                appendCompareCell(html, container1.getCpuAvgPercent(), container2 != null ? container2.getCpuAvgPercent() : null, "%");
+                appendCompareCell(html, container1.getCpuMaxAbs(), container2 != null ? container2.getCpuMaxAbs() : null, "");
+                appendCompareCell(html, container1.getMemMaxPercent(), container2 != null ? container2.getMemMaxPercent() : null, "%");
+                appendCompareCell(html, container1.getMemAvgPercent(), container2 != null ? container2.getMemAvgPercent() : null, "%");
+                appendCompareCell(html, container1.getMemMaxAbs(), container2 != null ? container2.getMemMaxAbs() : null, "");
                 
-                int diffCpuMax = container2 != null ? container1.getCpuMaxPercent() - container2.getCpuMaxPercent() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffCpuMax)).append("\">")
-                    .append(container1.getCpuMaxPercent()).append("% (").append(formatDiff(diffCpuMax)).append(")</td>\n");
-                int diffCpuAvg = container2 != null ? container1.getCpuAvgPercent() - container2.getCpuAvgPercent() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffCpuAvg)).append("\">")
-                    .append(container1.getCpuAvgPercent()).append("% (").append(formatDiff(diffCpuAvg)).append(")</td>\n");
-                int diffCpuAbs = container2 != null ? container1.getCpuMaxAbs() - container2.getCpuMaxAbs() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffCpuAbs)).append("\">")
-                    .append(container1.getCpuMaxAbs()).append(" (").append(formatDiff(diffCpuAbs)).append(")</td>\n");
-                
-                int diffMemMax = container2 != null ? container1.getMemMaxPercent() - container2.getMemMaxPercent() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffMemMax)).append("\">")
-                    .append(container1.getMemMaxPercent()).append("% (").append(formatDiff(diffMemMax)).append(")</td>\n");
-                int diffMemAvg = container2 != null ? container1.getMemAvgPercent() - container2.getMemAvgPercent() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffMemAvg)).append("\">")
-                    .append(container1.getMemAvgPercent()).append("% (").append(formatDiff(diffMemAvg)).append(")</td>\n");
-                int diffMemAbs = container2 != null ? container1.getMemMaxAbs() - container2.getMemMaxAbs() : 0;
-                html.append("                <td class=\"").append(getDiffColorClass(diffMemAbs)).append("\">")
-                    .append(container1.getMemMaxAbs()).append(" (").append(formatDiff(diffMemAbs)).append(")</td>\n");
-                
-                // Время старта (по деплойменту, rowspan)
                 if (isFirstRow) {
                     long start1 = deployment1.getStartTime();
-                    long start2 = deployment2 != null ? deployment2.getStartTime() : start1;
-                    int diffStart = (int) (start1 - start2);
-                    String diffStartClass = getDiffColorClass(diffStart);
-                    html.append("                <td rowspan=\"").append(containerCount).append("\" class=\"").append(diffStartClass).append("\">")
-                        .append(start1).append(" с")
-                        .append(deployment2 != null ? " (" + formatDiff(diffStart) + ")" : "")
-                        .append("</td>\n");
+                    Long start2 = deployment2 != null ? deployment2.getStartTime() : null;
+                    String startSuffix = " с";
+                    html.append("                <td rowspan=\"").append(containerCount).append("\" class=\"")
+                        .append(getCompareColorClass(start1, start2)).append("\">");
+                    html.append(start1).append(startSuffix);
+                    if (start2 != null) {
+                        html.append(" (").append(start2).append(startSuffix).append(")");
+                    } else {
+                        html.append(" (—)");
+                    }
+                    html.append("</td>\n");
                 }
                 
                 html.append("            </tr>\n");
@@ -216,22 +195,26 @@ public class HtmlComparisonService {
         return html.toString();
     }
     
-    private String getDiffColorClass(int diff) {
-        if (diff < 0) {
-            return "diff-green"; // Отрицательная разница - зеленый
-        } else if (diff > 0) {
-            return "diff-red"; // Положительная разница - красный
-        } else {
-            return "diff-yellow"; // Ноль - желтый
-        }
+    /** Зелёный — значение увеличилось (v2 > v1), красный — уменьшилось (v2 < v1), без заливки — не изменилось. */
+    private String getCompareColorClass(long v1, Long v2) {
+        if (v2 == null) return "";
+        if (v2 > v1) return "diff-increased";
+        if (v2 < v1) return "diff-decreased";
+        return "";
     }
-    
-    private String formatDiff(int diff) {
-        if (diff > 0) {
-            return "+" + diff;
+
+    private void appendCompareCell(StringBuilder html, int v1, Integer v2, String suffix) {
+        Long v2Long = (v2 != null) ? Long.valueOf(v2) : null;
+        String cls = getCompareColorClass((long) v1, v2Long);
+        html.append("                <td");
+        if (!cls.isEmpty()) html.append(" class=\"").append(cls).append("\"");
+        html.append(">").append(v1).append(suffix);
+        if (v2 != null) {
+            html.append(" (").append(v2).append(suffix).append(")");
         } else {
-            return String.valueOf(diff);
+            html.append(" (—)");
         }
+        html.append("</td>\n");
     }
 
     private String escapeHtml(String s) {
