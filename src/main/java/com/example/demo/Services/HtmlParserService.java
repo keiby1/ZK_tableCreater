@@ -66,12 +66,13 @@ public class HtmlParserService {
             
             if (currentDeployment == null || cells.size() < 13 - cellOffset) continue;
             
+            // Порядок столбцов: Container, CpuRq, CpuLim, MemRq, MemLim, CpuMaxUse, CpuAvgUse, CpuAbsUse, MemMaxUse, MemAvgUse, MemAbsUse [, Время старта]
             Container container = new Container();
             container.setName(cells.get(2 - cellOffset));
-            container.setCpuLim(parseInt(cells.get(3 - cellOffset)));
-            container.setCpuRq(parseInt(cells.get(4 - cellOffset)));
-            container.setMemLim(parseInt(cells.get(5 - cellOffset)));
-            container.setMemRq(parseInt(cells.get(6 - cellOffset)));
+            container.setCpuRq(parseInt(cells.get(3 - cellOffset)));
+            container.setCpuLim(parseInt(cells.get(4 - cellOffset)));
+            container.setMemRq(parseInt(cells.get(5 - cellOffset)));
+            container.setMemLim(parseInt(cells.get(6 - cellOffset)));
             container.setCpuMaxPercent(parseInt(cells.get(7 - cellOffset)));
             container.setCpuAvgPercent(parseInt(cells.get(8 - cellOffset)));
             container.setCpuMaxAbs(parseInt(cells.get(9 - cellOffset)));

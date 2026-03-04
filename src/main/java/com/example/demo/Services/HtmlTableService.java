@@ -7,7 +7,9 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class HtmlTableService {
@@ -118,10 +120,10 @@ public class HtmlTableService {
         html.append("                <th>Количество подов</th>\n");
         html.append("                <th>Workload</th>\n");
         html.append("                <th>Container</th>\n");
-        html.append("                <th>CpuLim</th>\n");
         html.append("                <th>CpuRq</th>\n");
-        html.append("                <th>MemLim</th>\n");
+        html.append("                <th>CpuLim</th>\n");
         html.append("                <th>MemRq</th>\n");
+        html.append("                <th>MemLim</th>\n");
         html.append("                <th>CpuMaxUse</th>\n");
         html.append("                <th>CpuAvgUse</th>\n");
         html.append("                <th>CpuAbsUse</th>\n");
@@ -146,9 +148,17 @@ public class HtmlTableService {
         long sumMemAvgUse = 0;
         int totalContainers = 0;
         
+        // Сортировка: 1) по Workload (A–Z), 2) по Container внутри workload (A–Z)
+        List<Deployment> sortedDeployments = deployments.stream()
+                .sorted(Comparator.comparing(Deployment::getName))
+                .collect(Collectors.toList());
+
         // Заполнение таблицы данными
-        for (Deployment deployment : deployments) {
-            int containerCount = deployment.getContainers().size();
+        for (Deployment deployment : sortedDeployments) {
+            List<Container> sortedContainers = deployment.getContainers().stream()
+                    .sorted(Comparator.comparing(Container::getName))
+                    .collect(Collectors.toList());
+            int containerCount = sortedContainers.size();
             boolean isFirstRow = true;
 
             // Суммы по контейнерам деплоймента для проверки лимитов
@@ -156,7 +166,7 @@ public class HtmlTableService {
             long deployCpuRq = 0;
             long deployMemLim = 0;
             long deployMemRq = 0;
-            for (Container c : deployment.getContainers()) {
+            for (Container c : sortedContainers) {
                 deployCpuLim += c.getCpuLim();
                 deployCpuRq += c.getCpuRq();
                 deployMemLim += c.getMemLim();
@@ -171,7 +181,7 @@ public class HtmlTableService {
             String memLimClass = memLimOver ? "over-limit" : "";
             String memRqClass = memRqOver ? "over-limit" : "";
             
-            for (Container container : deployment.getContainers()) {
+            for (Container container : sortedContainers) {
                 html.append("            <tr>\n");
                 
                 // Количество подов (rowspan только для первой строки)
@@ -188,21 +198,15 @@ public class HtmlTableService {
                 // Название контейнера
                 html.append("                <td>").append(container.getName()).append("</td>\n");
                 
-                // ЦПУ лимиты — закрашиваем только если сумма CpuLim по деплойменту > 4000
-                appendTd(html, container.getCpuLim(), cpuLimClass);
-                sumCpuLim += container.getCpuLim();
-                
-                // ЦПУ реквесты — закрашиваем только если сумма CpuRq по деплойменту > 4000
+                // CpuRq, CpuLim, MemRq, MemLim (порядок столбцов)
                 appendTd(html, container.getCpuRq(), cpuRqClass);
                 sumCpuRq += container.getCpuRq();
-                
-                // Память лимиты — закрашиваем только если сумма MemLim по деплойменту > 10000
-                appendTd(html, container.getMemLim(), memLimClass);
-                sumMemLim += container.getMemLim();
-                
-                // Память реквесты — закрашиваем только если сумма MemRq по деплойменту > 10000
+                appendTd(html, container.getCpuLim(), cpuLimClass);
+                sumCpuLim += container.getCpuLim();
                 appendTd(html, container.getMemRq(), memRqClass);
                 sumMemRq += container.getMemRq();
+                appendTd(html, container.getMemLim(), memLimClass);
+                sumMemLim += container.getMemLim();
                 
                 // ЦПУ утилизация макс с цветовой подсветкой
                 String cpuMaxClass = getCpuColorClass(container.getCpuMaxPercent());
@@ -250,13 +254,13 @@ public class HtmlTableService {
             }
         }
         
-        // Итоговая строка
+        // Итоговая строка (порядок: CpuRq, CpuLim, MemRq, MemLim, ...)
         html.append("            <tr style=\"font-weight: bold; background-color: #e0e0e0;\">\n");
         html.append("                <td colspan=\"3\">Итого</td>\n");
-        html.append("                <td>").append(sumCpuLim).append("</td>\n");
         html.append("                <td>").append(sumCpuRq).append("</td>\n");
-        html.append("                <td>").append(sumMemLim).append("</td>\n");
+        html.append("                <td>").append(sumCpuLim).append("</td>\n");
         html.append("                <td>").append(sumMemRq).append("</td>\n");
+        html.append("                <td>").append(sumMemLim).append("</td>\n");
         html.append("                <td>").append(Math.round((double)sumCpuMaxUse / totalContainers)).append("%</td>\n");
         html.append("                <td>").append(Math.round((double)sumCpuAvgUse / totalContainers)).append("%</td>\n");
         html.append("                <td>").append(sumCpuAbsUse).append("</td>\n");

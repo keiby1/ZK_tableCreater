@@ -4,9 +4,11 @@ import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class HtmlComparisonService {
@@ -95,16 +97,18 @@ public class HtmlComparisonService {
         html.append("        <thead>\n");
         html.append("            <tr>\n");
         html.append("                <th>Количество подов</th>\n");
-        html.append("                <th>Deployment</th>\n");
+        html.append("                <th>Workload</th>\n");
         html.append("                <th>Container</th>\n");
-        html.append("                <th>CpuLim</th>\n");
         html.append("                <th>CpuRq</th>\n");
-        html.append("                <th>MemLim</th>\n");
+        html.append("                <th>CpuLim</th>\n");
         html.append("                <th>MemRq</th>\n");
+        html.append("                <th>MemLim</th>\n");
         html.append("                <th>CpuMaxUse</th>\n");
         html.append("                <th>CpuAvgUse</th>\n");
+        html.append("                <th>CpuAbsUse</th>\n");
         html.append("                <th>MemMaxUse</th>\n");
         html.append("                <th>MemAvgUse</th>\n");
+        html.append("                <th>MemAbsUse</th>\n");
         html.append("                <th>Время старта</th>\n");
         html.append("            </tr>\n");
         html.append("        </thead>\n");
@@ -115,15 +119,21 @@ public class HtmlComparisonService {
         for (Deployment dep : deployments2) {
             deploymentMap2.put(dep.getName(), dep);
         }
+
+        // Сортировка: по Workload (A–Z), по Container внутри (A–Z)
+        List<Deployment> sortedDeployments1 = deployments1.stream()
+                .sorted(Comparator.comparing(Deployment::getName))
+                .collect(Collectors.toList());
         
         // Заполнение таблицы данными
-        for (Deployment deployment1 : deployments1) {
+        for (Deployment deployment1 : sortedDeployments1) {
             Deployment deployment2 = deploymentMap2.get(deployment1.getName());
-            
-            int containerCount = deployment1.getContainers().size();
+            List<Container> sortedContainers1 = deployment1.getContainers().stream()
+                    .sorted(Comparator.comparing(Container::getName))
+                    .collect(Collectors.toList());
+            int containerCount = sortedContainers1.size();
             boolean isFirstRow = true;
             
-            // Создаем карту контейнеров из второго деплоймента
             Map<String, Container> containerMap2 = new HashMap<>();
             if (deployment2 != null) {
                 for (Container cont : deployment2.getContainers()) {
@@ -131,89 +141,55 @@ public class HtmlComparisonService {
                 }
             }
             
-            for (Container container1 : deployment1.getContainers()) {
+            for (Container container1 : sortedContainers1) {
                 Container container2 = containerMap2.get(container1.getName());
                 
                 html.append("            <tr>\n");
                 
-                // Количество подов (rowspan только для первой строки)
                 if (isFirstRow) {
                     html.append("                <td rowspan=\"").append(containerCount).append("\">")
                         .append(deployment1.getPodCount()).append("</td>\n");
                 }
-                
-                // Название пода (rowspan только для первой строки)
                 if (isFirstRow) {
                     html.append("                <td rowspan=\"").append(containerCount).append("\">")
                         .append(deployment1.getName()).append("</td>\n");
                 }
                 
-                // Название контейнера
                 html.append("                <td>").append(container1.getName()).append("</td>\n");
                 
-                // ЦПУ лимиты с разницей
-                int diffCpuLim = container2 != null ? container1.getCpuLim() - container2.getCpuLim() : 0;
-                String diffCpuLimClass = getDiffColorClass(diffCpuLim);
-                html.append("                <td class=\"").append(diffCpuLimClass).append("\">")
-                    .append(container1.getCpuLim())
-                    .append(" (").append(formatDiff(diffCpuLim)).append(")")
-                    .append("</td>\n");
-                
-                // ЦПУ реквесты с разницей
+                // Порядок: CpuRq, CpuLim, MemRq, MemLim
                 int diffCpuRq = container2 != null ? container1.getCpuRq() - container2.getCpuRq() : 0;
-                String diffCpuRqClass = getDiffColorClass(diffCpuRq);
-                html.append("                <td class=\"").append(diffCpuRqClass).append("\">")
-                    .append(container1.getCpuRq())
-                    .append(" (").append(formatDiff(diffCpuRq)).append(")")
-                    .append("</td>\n");
-                
-                // Память лимиты с разницей
-                int diffMemLim = container2 != null ? container1.getMemLim() - container2.getMemLim() : 0;
-                String diffMemLimClass = getDiffColorClass(diffMemLim);
-                html.append("                <td class=\"").append(diffMemLimClass).append("\">")
-                    .append(container1.getMemLim())
-                    .append(" (").append(formatDiff(diffMemLim)).append(")")
-                    .append("</td>\n");
-                
-                // Память реквесты с разницей
+                html.append("                <td class=\"").append(getDiffColorClass(diffCpuRq)).append("\">")
+                    .append(container1.getCpuRq()).append(" (").append(formatDiff(diffCpuRq)).append(")</td>\n");
+                int diffCpuLim = container2 != null ? container1.getCpuLim() - container2.getCpuLim() : 0;
+                html.append("                <td class=\"").append(getDiffColorClass(diffCpuLim)).append("\">")
+                    .append(container1.getCpuLim()).append(" (").append(formatDiff(diffCpuLim)).append(")</td>\n");
                 int diffMemRq = container2 != null ? container1.getMemRq() - container2.getMemRq() : 0;
-                String diffMemRqClass = getDiffColorClass(diffMemRq);
-                html.append("                <td class=\"").append(diffMemRqClass).append("\">")
-                    .append(container1.getMemRq())
-                    .append(" (").append(formatDiff(diffMemRq)).append(")")
-                    .append("</td>\n");
+                html.append("                <td class=\"").append(getDiffColorClass(diffMemRq)).append("\">")
+                    .append(container1.getMemRq()).append(" (").append(formatDiff(diffMemRq)).append(")</td>\n");
+                int diffMemLim = container2 != null ? container1.getMemLim() - container2.getMemLim() : 0;
+                html.append("                <td class=\"").append(getDiffColorClass(diffMemLim)).append("\">")
+                    .append(container1.getMemLim()).append(" (").append(formatDiff(diffMemLim)).append(")</td>\n");
                 
-                // ЦПУ утилизация макс с разницей
                 int diffCpuMax = container2 != null ? container1.getCpuMaxPercent() - container2.getCpuMaxPercent() : 0;
-                String diffCpuMaxClass = getDiffColorClass(diffCpuMax);
-                html.append("                <td class=\"").append(diffCpuMaxClass).append("\">")
-                    .append(container1.getCpuMaxPercent()).append("%")
-                    .append(" (").append(formatDiff(diffCpuMax)).append(")")
-                    .append("</td>\n");
-                
-                // ЦПУ утилизация сред с разницей
+                html.append("                <td class=\"").append(getDiffColorClass(diffCpuMax)).append("\">")
+                    .append(container1.getCpuMaxPercent()).append("% (").append(formatDiff(diffCpuMax)).append(")</td>\n");
                 int diffCpuAvg = container2 != null ? container1.getCpuAvgPercent() - container2.getCpuAvgPercent() : 0;
-                String diffCpuAvgClass = getDiffColorClass(diffCpuAvg);
-                html.append("                <td class=\"").append(diffCpuAvgClass).append("\">")
-                    .append(container1.getCpuAvgPercent()).append("%")
-                    .append(" (").append(formatDiff(diffCpuAvg)).append(")")
-                    .append("</td>\n");
+                html.append("                <td class=\"").append(getDiffColorClass(diffCpuAvg)).append("\">")
+                    .append(container1.getCpuAvgPercent()).append("% (").append(formatDiff(diffCpuAvg)).append(")</td>\n");
+                int diffCpuAbs = container2 != null ? container1.getCpuMaxAbs() - container2.getCpuMaxAbs() : 0;
+                html.append("                <td class=\"").append(getDiffColorClass(diffCpuAbs)).append("\">")
+                    .append(container1.getCpuMaxAbs()).append(" (").append(formatDiff(diffCpuAbs)).append(")</td>\n");
                 
-                // Утилизация памяти макс с разницей
                 int diffMemMax = container2 != null ? container1.getMemMaxPercent() - container2.getMemMaxPercent() : 0;
-                String diffMemMaxClass = getDiffColorClass(diffMemMax);
-                html.append("                <td class=\"").append(diffMemMaxClass).append("\">")
-                    .append(container1.getMemMaxPercent()).append("%")
-                    .append(" (").append(formatDiff(diffMemMax)).append(")")
-                    .append("</td>\n");
-                
-                // Утилизация памяти сред с разницей
+                html.append("                <td class=\"").append(getDiffColorClass(diffMemMax)).append("\">")
+                    .append(container1.getMemMaxPercent()).append("% (").append(formatDiff(diffMemMax)).append(")</td>\n");
                 int diffMemAvg = container2 != null ? container1.getMemAvgPercent() - container2.getMemAvgPercent() : 0;
-                String diffMemAvgClass = getDiffColorClass(diffMemAvg);
-                html.append("                <td class=\"").append(diffMemAvgClass).append("\">")
-                    .append(container1.getMemAvgPercent()).append("%")
-                    .append(" (").append(formatDiff(diffMemAvg)).append(")")
-                    .append("</td>\n");
+                html.append("                <td class=\"").append(getDiffColorClass(diffMemAvg)).append("\">")
+                    .append(container1.getMemAvgPercent()).append("% (").append(formatDiff(diffMemAvg)).append(")</td>\n");
+                int diffMemAbs = container2 != null ? container1.getMemMaxAbs() - container2.getMemMaxAbs() : 0;
+                html.append("                <td class=\"").append(getDiffColorClass(diffMemAbs)).append("\">")
+                    .append(container1.getMemMaxAbs()).append(" (").append(formatDiff(diffMemAbs)).append(")</td>\n");
                 
                 // Время старта (по деплойменту, rowspan)
                 if (isFirstRow) {
