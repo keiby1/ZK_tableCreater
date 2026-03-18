@@ -66,6 +66,9 @@ public class VictoriaMetricsService {
         // 4) Утилизация CPU и памяти (avg/max за период)
         Map<ContainerKey, UsageValues> usage = queryContainerUsage(range, namespace, evaluationTimeSec);
 
+        // 4.4) Троттлинг CPU (CFS): % throttled periods за период
+        Map<ContainerKey, Double> throttlingPercent = queryThrottlingPercent(range, namespace, evaluationTimeSec);
+
         // 4.5) Время старта пода (сек): kube_pod_start_time - kube_pod_created по каждому поду
         Map<String, Long> podStartupSeconds = queryPodStartupSeconds(namespace, evaluationTimeSec);
 
@@ -89,7 +92,7 @@ public class VictoriaMetricsService {
             DeploymentKey dk = e.getKey();
             int podCount = deploymentReplicas.getOrDefault(dk.namespace + "/" + dk.deploymentName, 0);
             if (podCount == 0) continue;
-            Deployment deployment = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage, podStartupSeconds);
+            Deployment deployment = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage, throttlingPercent, podStartupSeconds);
             if (deployment != null) {
                 deployment.setWorkloadType("Deployment");
                 result.add(deployment);
@@ -113,7 +116,7 @@ public class VictoriaMetricsService {
             DeploymentKey dk = e.getKey();
             int podCount = statefulSetReplicas.getOrDefault(dk.namespace + "/" + dk.deploymentName, 0);
             if (podCount == 0) continue;
-            Deployment statefulSet = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage, podStartupSeconds);
+            Deployment statefulSet = buildWorkload(dk.deploymentName, podCount, e.getValue(), resources, usage, throttlingPercent, podStartupSeconds);
             if (statefulSet != null) {
                 statefulSet.setWorkloadType("StatefulSet");
                 result.add(statefulSet);
@@ -127,6 +130,7 @@ public class VictoriaMetricsService {
     private Deployment buildWorkload(String name, int podCount, List<ContainerKey> containerKeys,
                                      Map<ContainerKey, ResourceValues> resources,
                                      Map<ContainerKey, UsageValues> usage,
+                                     Map<ContainerKey, Double> throttlingPercent,
                                      Map<String, Long> podStartupSeconds) {
         Deployment deployment = new Deployment();
         deployment.setName(name);
@@ -143,7 +147,7 @@ public class VictoriaMetricsService {
         Map<String, List<ContainerKey>> byContainer = containerKeys.stream()
                 .collect(Collectors.groupingBy(ck -> ck.container));
         for (Map.Entry<String, List<ContainerKey>> ce : byContainer.entrySet()) {
-            Container container = buildContainer(ce.getKey(), ce.getValue(), resources, usage);
+            Container container = buildContainer(ce.getKey(), ce.getValue(), resources, usage, throttlingPercent);
             deployment.getContainers().add(container);
         }
         if (deployment.getContainers().isEmpty()) return null;
@@ -366,6 +370,32 @@ public class VictoriaMetricsService {
         return out;
     }
 
+    /**
+     * Троттлинг CPU (CFS): доля throttled periods в %.
+     * PromQL: 100 * (rate(throttled_periods) / rate(periods_total)), avg за период.
+     */
+    private Map<ContainerKey, Double> queryThrottlingPercent(String range, String namespace, Long evaluationTimeSec) {
+        Map<ContainerKey, Double> out = new HashMap<>();
+        String step = config.getSubqueryStep();
+        String cpuWindow = config.getCpuRateWindow();
+        String throttled = addNamespaceFilter(
+                "rate(container_cpu_cfs_throttled_periods_total{container!=\"\", container!=\"POD\"}[" + cpuWindow + "])", namespace);
+        String periods = addNamespaceFilter(
+                "rate(container_cpu_cfs_periods_total{container!=\"\", container!=\"POD\"}[" + cpuWindow + "])", namespace);
+        String ratio = "(" + throttled + " / " + periods + ") * 100";
+        String qThrottling = "avg_over_time(" + ratio + "[" + range + ":" + step + "])";
+        PrometheusResponse resp = client.query(qThrottling, evaluationTimeSec);
+        if (resp == null || resp.getData() == null || resp.getData().getResult() == null) return out;
+        for (PrometheusResponse.Result r : resp.getData().getResult()) {
+            ContainerKey ck = containerKeyFromMetric(r.getMetric());
+            if (ck == null) continue;
+            double v = VictoriaMetricsClient.parseValue(r.getValue());
+            if (Double.isNaN(v) || v < 0) continue;
+            out.put(ck, Math.min(100, v));
+        }
+        return out;
+    }
+
     private void fillUsageMetric(Map<ContainerKey, UsageValues> out, String query,
                                  java.util.function.BiConsumer<UsageValues, Double> setter,
                                  Long evaluationTimeSec) {
@@ -382,7 +412,8 @@ public class VictoriaMetricsService {
 
     private Container buildContainer(String containerName, List<ContainerKey> keys,
                                      Map<ContainerKey, ResourceValues> resources,
-                                     Map<ContainerKey, UsageValues> usage) {
+                                     Map<ContainerKey, UsageValues> usage,
+                                     Map<ContainerKey, Double> throttlingPercent) {
         Container c = new Container();
         c.setName(containerName);
 
@@ -476,6 +507,14 @@ public class VictoriaMetricsService {
         }
         c.setCpuMaxAbs((int) Math.round(cpuMaxAbs));
         c.setMemMaxAbs((int) Math.round(memMaxAbs));
+
+        // Троттлинг: макс % по подам (один контейнер может быть в нескольких подах)
+        double throttlingMax = 0;
+        for (ContainerKey ck : keys) {
+            Double pct = throttlingPercent != null ? throttlingPercent.get(ck) : null;
+            if (pct != null && !Double.isNaN(pct)) throttlingMax = Math.max(throttlingMax, pct);
+        }
+        c.setThrottlingPercent((int) Math.round(throttlingMax));
 
         return c;
     }

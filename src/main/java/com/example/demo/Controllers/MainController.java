@@ -226,6 +226,7 @@ public class MainController {
         container1_1.setMemMaxPercent(70);
         container1_1.setMemAvgPercent(55);
         container1_1.setMemMaxAbs(358);
+        container1_1.setThrottlingPercent(0);
         deployment1.getContainers().add(container1_1);
         
         Container container1_2 = new Container();
@@ -240,6 +241,7 @@ public class MainController {
         container1_2.setMemMaxPercent(45);
         container1_2.setMemAvgPercent(30);
         container1_2.setMemMaxAbs(460);
+        container1_2.setThrottlingPercent(2);
         deployment1.getContainers().add(container1_2);
         
         Container container1_3 = new Container();
@@ -254,6 +256,7 @@ public class MainController {
         container1_3.setMemMaxPercent(85);
         container1_3.setMemAvgPercent(75);
         container1_3.setMemMaxAbs(217);
+        container1_3.setThrottlingPercent(4);
         deployment1.getContainers().add(container1_3);
         
         deployments.add(deployment1);
@@ -277,6 +280,7 @@ public class MainController {
         container2_1.setMemMaxPercent(68);
         container2_1.setMemAvgPercent(50);
         container2_1.setMemMaxAbs(1392);
+        container2_1.setThrottlingPercent(6);
         deployment2.getContainers().add(container2_1);
         
         Container container2_2 = new Container();
@@ -291,6 +295,7 @@ public class MainController {
         container2_2.setMemMaxPercent(55);
         container2_2.setMemAvgPercent(40);
         container2_2.setMemMaxAbs(2252);
+        container2_2.setThrottlingPercent(1);
         deployment2.getContainers().add(container2_2);
         
         Container container2_3 = new Container();
@@ -305,6 +310,7 @@ public class MainController {
         container2_3.setMemMaxPercent(25);
         container2_3.setMemAvgPercent(15);
         container2_3.setMemMaxAbs(256);
+        container2_3.setThrottlingPercent(3);
         deployment2.getContainers().add(container2_3);
         
         deployments.add(deployment2);
@@ -328,6 +334,7 @@ public class MainController {
         container3_1.setMemMaxPercent(58);
         container3_1.setMemAvgPercent(42);
         container3_1.setMemMaxAbs(1187);
+        container3_1.setThrottlingPercent(5);
         deployment3.getContainers().add(container3_1);
         
         Container container3_2 = new Container();
@@ -342,6 +349,7 @@ public class MainController {
         container3_2.setMemMaxPercent(72);
         container3_2.setMemAvgPercent(58);
         container3_2.setMemMaxAbs(737);
+        container3_2.setThrottlingPercent(0);
         deployment3.getContainers().add(container3_2);
         
         Container container3_3 = new Container();
@@ -356,6 +364,7 @@ public class MainController {
         container3_3.setMemMaxPercent(95);
         container3_3.setMemAvgPercent(80);
         container3_3.setMemMaxAbs(486);
+        container3_3.setThrottlingPercent(2);
         deployment3.getContainers().add(container3_3);
         
         deployments.add(deployment3);

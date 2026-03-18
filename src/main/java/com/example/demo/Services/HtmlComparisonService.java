@@ -107,6 +107,7 @@ public class HtmlComparisonService {
         html.append("                <th>MemMaxUse</th>\n");
         html.append("                <th>MemAvgUse</th>\n");
         html.append("                <th>MemAbsUse</th>\n");
+        html.append("                <th>Троттлинг</th>\n");
         html.append("                <th>Время старта</th>\n");
         html.append("            </tr>\n");
         html.append("        </thead>\n");
@@ -166,6 +167,7 @@ public class HtmlComparisonService {
                 appendCompareCell(html, container1.getMemMaxPercent(), container2 != null ? container2.getMemMaxPercent() : null, "%");
                 appendCompareCell(html, container1.getMemAvgPercent(), container2 != null ? container2.getMemAvgPercent() : null, "%");
                 appendCompareCell(html, container1.getMemMaxAbs(), container2 != null ? container2.getMemMaxAbs() : null, "");
+                appendCompareCell(html, container1.getThrottlingPercent(), container2 != null ? container2.getThrottlingPercent() : null, "%");
                 
                 if (isFirstRow) {
                     long start1 = deployment1.getStartTime();

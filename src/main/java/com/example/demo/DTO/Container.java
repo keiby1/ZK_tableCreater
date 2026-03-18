@@ -21,5 +21,7 @@ public class Container {
     int MemMaxPercent;
     int MemAvgPercent;
     int MemMaxAbs;
+    /** Процент троттлинга CPU (CFS). */
+    int throttlingPercent;
 
 }

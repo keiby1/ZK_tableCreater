@@ -49,36 +49,38 @@ public class HtmlParserService {
             }
             
             if (hasRowspan) {
-                if (cells.size() < 13) continue;
+                if (cells.size() < 15) continue;
                 currentPodCount = parseInt(cells.get(0));
                 currentDeploymentName = cells.get(1);
                 currentDeployment = new Deployment();
                 currentDeployment.setName(currentDeploymentName);
                 currentDeployment.setPodCount(currentPodCount);
-                currentDeployment.setStartTime(cells.size() >= 14 ? parseInt(cells.get(13)) : 0);
+                currentDeployment.setStartTime(cells.size() >= 15 ? parseInt(cells.get(14)) : 0);
                 currentDeployment.setContainers(new LinkedList<>());
                 deployments.add(currentDeployment);
                 cellOffset = 0;
             } else {
                 cellOffset = 2;
-                if (cells.size() < 11) continue;
+                if (cells.size() < 12) continue;
             }
             
-            if (currentDeployment == null || cells.size() < 13 - cellOffset) continue;
+            if (currentDeployment == null || cells.size() < 14 - cellOffset) continue;
             
-            // Порядок столбцов: Container, CpuRq, CpuLim, MemRq, MemLim, CpuMaxUse, CpuAvgUse, CpuAbsUse, MemMaxUse, MemAvgUse, MemAbsUse [, Время старта]
+            // Порядок: Container, CpuRq, CpuLim, MemRq, MemLim, CpuMaxUse, CpuAvgUse, CpuAbsUse, MemMaxUse, MemAvgUse, MemAbsUse, Троттлинг [, Время старта]
+            int ci = 2 - cellOffset;
             Container container = new Container();
-            container.setName(cells.get(2 - cellOffset));
-            container.setCpuRq(parseInt(cells.get(3 - cellOffset)));
-            container.setCpuLim(parseInt(cells.get(4 - cellOffset)));
-            container.setMemRq(parseInt(cells.get(5 - cellOffset)));
-            container.setMemLim(parseInt(cells.get(6 - cellOffset)));
-            container.setCpuMaxPercent(parseInt(cells.get(7 - cellOffset)));
-            container.setCpuAvgPercent(parseInt(cells.get(8 - cellOffset)));
-            container.setCpuMaxAbs(parseInt(cells.get(9 - cellOffset)));
-            container.setMemMaxPercent(parseInt(cells.get(10 - cellOffset)));
-            container.setMemAvgPercent(parseInt(cells.get(11 - cellOffset)));
-            container.setMemMaxAbs(parseInt(cells.get(12 - cellOffset)));
+            container.setName(cells.get(ci));
+            container.setCpuRq(parseInt(cells.get(ci + 1)));
+            container.setCpuLim(parseInt(cells.get(ci + 2)));
+            container.setMemRq(parseInt(cells.get(ci + 3)));
+            container.setMemLim(parseInt(cells.get(ci + 4)));
+            container.setCpuMaxPercent(parseInt(cells.get(ci + 5)));
+            container.setCpuAvgPercent(parseInt(cells.get(ci + 6)));
+            container.setCpuMaxAbs(parseInt(cells.get(ci + 7)));
+            container.setMemMaxPercent(parseInt(cells.get(ci + 8)));
+            container.setMemAvgPercent(parseInt(cells.get(ci + 9)));
+            container.setMemMaxAbs(parseInt(cells.get(ci + 10)));
+            container.setThrottlingPercent(parseInt(cells.get(ci + 11)));
             currentDeployment.getContainers().add(container);
         }
         

@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class HtmlTableService {
 
     private static final int MAX_CPU_PER_DEPLOYMENT = 4000;
-    private static final int MAX_RAM_PER_DEPLOYMENT = 10000;
+    private static final int MAX_RAM_PER_DEPLOYMENT = 8000; // 8 ГБ (в МБ)
 
     private static final DateTimeFormatter INTERVAL_FORMAT =
             DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss").withZone(ZoneId.of("UTC"));
@@ -106,6 +106,7 @@ public class HtmlTableService {
         html.append("                <li><span class=\"swatch\" style=\"background:#fff9c4\"></span> Время старта: 1–1.5 мин</li>\n");
         html.append("                <li><span class=\"swatch\" style=\"background:#ffe0b2\"></span> Время старта: 1.5–2 мин</li>\n");
         html.append("                <li><span class=\"swatch\" style=\"background:#ffcdd2\"></span> Время старта: более 2 мин</li>\n");
+        html.append("                <li>Троттлинг: ≤1% — зелёный; &gt;1% и ≤3% — жёлтый; &gt;3% и ≤5% — оранжевый; &gt;5% — красный</li>\n");
         html.append("            </ul>\n");
         html.append("        </details>\n");
         html.append("    </div>\n");
@@ -130,6 +131,7 @@ public class HtmlTableService {
         html.append("                <th>MemMaxUse</th>\n");
         html.append("                <th>MemAvgUse</th>\n");
         html.append("                <th>MemAbsUse</th>\n");
+        html.append("                <th>Троттлинг</th>\n");
         html.append("                <th>Время старта</th>\n");
         html.append("            </tr>\n");
         html.append("        </thead>\n");
@@ -146,6 +148,7 @@ public class HtmlTableService {
         long sumCpuAvgUse = 0;
         long sumMemMaxUse = 0;
         long sumMemAvgUse = 0;
+        long sumThrottlingPercent = 0;
         int totalContainers = 0;
         
         // Сортировка: 1) по Workload (A–Z), 2) по Container внутри workload (A–Z)
@@ -240,6 +243,13 @@ public class HtmlTableService {
                 html.append("                <td>").append(container.getMemMaxAbs()).append("</td>\n");
                 sumMemAbsUse += container.getMemMaxAbs();
                 
+                // Троттлинг CPU (предпоследний столбец)
+                int throttling = container.getThrottlingPercent();
+                String throttlingClass = getThrottlingColorClass(throttling);
+                html.append("                <td class=\"").append(throttlingClass).append("\">")
+                    .append(throttling).append("%</td>\n");
+                sumThrottlingPercent += throttling;
+                
                 // Время старта (один столбец на деплоймент, rowspan)
                 if (isFirstRow) {
                     long startSec = deployment.getStartTime();
@@ -267,6 +277,7 @@ public class HtmlTableService {
         html.append("                <td>").append(Math.round((double)sumMemMaxUse / totalContainers)).append("%</td>\n");
         html.append("                <td>").append(Math.round((double)sumMemAvgUse / totalContainers)).append("%</td>\n");
         html.append("                <td>").append(sumMemAbsUse).append("</td>\n");
+        html.append("                <td>").append(totalContainers > 0 ? Math.round((double) sumThrottlingPercent / totalContainers) + "%" : "—").append("</td>\n");
         html.append("                <td>—</td>\n");
         html.append("            </tr>\n");
         
@@ -317,6 +328,14 @@ public class HtmlTableService {
         } else {
             return "mem-red-dark"; // >= 80% - критически высокая утилизация (включая > 100%)
         }
+    }
+
+    /** Цвет по троттлингу: ≤1% — зелёный, >1% и ≤3% — жёлтый, >3% и ≤5% — оранжевый, >5% — красный. */
+    private String getThrottlingColorClass(int percent) {
+        if (percent <= 1) return "cpu-green";
+        if (percent <= 3) return "cpu-yellow";
+        if (percent <= 5) return "start-orange";
+        return "cpu-red-dark";
     }
 
     /** Цвет по времени старта (секунды): до 1 мин — зелёный, 1м1с–1.5 мин — желтоватый, 1.5–2 мин — оранжевый, >2 мин — красный (приглушённые цвета). */
