@@ -2,6 +2,7 @@ package com.example.demo.Services;
 
 import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -13,6 +14,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class HtmlTableService {
+
+    @Autowired
+    private AppLayoutService appLayoutService;
 
     private static final int MAX_CPU_PER_DEPLOYMENT = 4000;
     private static final int MAX_RAM_PER_DEPLOYMENT = 8000; // 8 ГБ (в МБ)
@@ -30,6 +34,14 @@ public class HtmlTableService {
      * @param to   конец интервала (UTC, мс) или null
      */
     public String generateHtmlTable(List<Deployment> deployments, Long from, Long to) {
+        return generateHtmlTable(deployments, from, to, true);
+    }
+
+    /**
+     * Генерирует HTML таблицу.
+     * @param includeHeader false — не включать хедер/меню (для сохранения в файл)
+     */
+    public String generateHtmlTable(List<Deployment> deployments, Long from, Long to, boolean includeHeader) {
         StringBuilder html = new StringBuilder();
         
         html.append("<!DOCTYPE html>\n");
@@ -93,23 +105,9 @@ public class HtmlTableService {
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
-        html.append("    <div class=\"legend\">\n");
-        html.append("        <details>\n");
-        html.append("            <summary>Расшифровка индикаторов</summary>\n");
-        html.append("            <ul>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#c8e6c9\"></span> CPU/память: оптимальная утилизация (60–79%)</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#fff9c4\"></span> CPU/память: низкая утилизация (20–59%)</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#ffcdd2\"></span> CPU/память: очень низкая (0–19%)</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#ef9a9a\"></span> CPU/память: критическая утилизация (≥80%)</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#78909c\"></span> Превышен лимит деплоймента по столбцу (CPU/RAM)</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#c8e6c9\"></span> Время старта: до 1 мин</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#fff9c4\"></span> Время старта: 1–1.5 мин</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#ffe0b2\"></span> Время старта: 1.5–2 мин</li>\n");
-        html.append("                <li><span class=\"swatch\" style=\"background:#ffcdd2\"></span> Время старта: более 2 мин</li>\n");
-        html.append("                <li>Троттлинг: ≤1% — зелёный; &gt;1% и ≤3% — жёлтый; &gt;3% и ≤5% — оранжевый; &gt;5% — красный</li>\n");
-        html.append("            </ul>\n");
-        html.append("        </details>\n");
-        html.append("    </div>\n");
+        if (includeHeader) {
+            html.append(appLayoutService.buildAppHeader());
+        }
         html.append("    <div class=\"interval-info\">\n");
         html.append("        Интервал выгрузки: ").append(formatInterval(from, to)).append("\n");
         html.append("    </div>\n");

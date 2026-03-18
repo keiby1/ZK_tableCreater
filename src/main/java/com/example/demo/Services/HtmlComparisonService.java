@@ -2,6 +2,7 @@ package com.example.demo.Services;
 
 import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -12,6 +13,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class HtmlComparisonService {
+
+    @Autowired
+    private AppLayoutService appLayoutService;
 
     public String generateComparisonTable(List<Deployment> deployments1, List<Deployment> deployments2) {
         return generateComparisonTable(deployments1, deployments2, null, null);
@@ -75,6 +79,7 @@ public class HtmlComparisonService {
         html.append("    </style>\n");
         html.append("</head>\n");
         html.append("<body>\n");
+        html.append(appLayoutService.buildAppHeader());
         html.append("    <div class=\"compare-header\">\n");
         html.append("        <h2>Сравнение: ").append(escapeHtml(name1)).append(" и ").append(escapeHtml(name2)).append("</h2>\n");
         html.append("        <p>В ячейке: <strong>слева</strong> — значение из первого файла (<em>").append(escapeHtml(name1)).append("</em>), <strong>в скобках</strong> — из второго (<em>").append(escapeHtml(name2)).append("</em>).</p>\n");

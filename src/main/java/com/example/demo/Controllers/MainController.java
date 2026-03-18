@@ -2,6 +2,7 @@ package com.example.demo.Controllers;
 
 import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
+import com.example.demo.Services.AppLayoutService;
 import com.example.demo.Services.HtmlComparisonService;
 import com.example.demo.Services.HtmlParserService;
 import com.example.demo.Services.HtmlTableService;
@@ -37,6 +38,9 @@ public class MainController {
 
     @Autowired
     private VictoriaMetricsService victoriaMetricsService;
+
+    @Autowired
+    private AppLayoutService appLayoutService;
     
     @RequestMapping("/ping")
     public String test(){
@@ -61,7 +65,7 @@ public class MainController {
         List<Deployment> deployments = useMetrics
                 ? victoriaMetricsService.fetchDeployments(namespace, from, to)
                 : generateTestData();
-        String html = htmlTableService.generateHtmlTable(deployments, from, to);
+        String html = htmlTableService.generateHtmlTable(deployments, from, to, false);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
@@ -176,6 +180,7 @@ public class MainController {
                 + "  </style>\n"
                 + "</head>\n"
                 + "<body>\n"
+                + appLayoutService.buildAppHeader()
                 + "  <h1>Сравнение двух таблиц выгрузки</h1>\n"
                 + "  <p class=\"hint\">Выберите два HTML-файла таблиц (скачанных через /get или /getHtml). Перетащите файлы в зоны или нажмите для выбора.</p>\n"
                 + "  <form id=\"compareForm\" action=\"/compare\" method=\"post\" enctype=\"multipart/form-data\">\n"
