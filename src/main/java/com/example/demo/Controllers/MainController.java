@@ -97,6 +97,22 @@ public class MainController {
     }
 
     /**
+     * Те же параметры и сбор данных, что и /get, но результат возвращается в виде JSON
+     * (список деплойментов с контейнерами и метриками).
+     */
+    @GetMapping(value = "/getJson", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<Deployment>> getJson(
+            @RequestParam(name = "useMetrics", defaultValue = "false") boolean useMetrics,
+            @RequestParam(name = "namespace", required = false) String namespace,
+            @RequestParam(name = "from", required = false) Long from,
+            @RequestParam(name = "to", required = false) Long to) {
+        List<Deployment> deployments = useMetrics
+                ? victoriaMetricsService.fetchDeployments(namespace, from, to)
+                : generateTestData();
+        return ResponseEntity.ok(deployments);
+    }
+
+    /**
      * GET /compare — страница с формой: два поля для выбора файлов (drag-drop и кнопки), затем отправка на POST /compare.
      */
     @GetMapping("/compare")
