@@ -76,8 +76,18 @@ public class HtmlTableService {
         html.append("            border: 1px solid #ddd;\n");
         html.append("            text-align: center;\n");
         html.append("        }\n");
-        html.append("        tr:hover {\n");
+        html.append("        tbody tr:hover {\n");
         html.append("            background-color: #f0f0f0;\n");
+        html.append("        }\n");
+        html.append("        tbody tr.data-row { cursor: pointer; }\n");
+        html.append("        tbody tr.data-row.row-selected {\n");
+        html.append("            outline: 3px solid #1976d2;\n");
+        html.append("            outline-offset: -3px;\n");
+        html.append("            background-color: #e3f2fd;\n");
+        html.append("        }\n");
+        html.append("        tbody tr.data-row.row-selected:hover {\n");
+        html.append("            background-color: #bbdefb;\n");
+        html.append("            outline-color: #0d47a1;\n");
         html.append("        }\n");
         html.append("        .cpu-green { background-color: #c8e6c9; }\n");
         html.append("        .cpu-yellow { background-color: #fff9c4; }\n");
@@ -183,7 +193,7 @@ public class HtmlTableService {
             String memRqClass = memRqOver ? "over-limit" : "";
             
             for (Container container : sortedContainers) {
-                html.append("            <tr>\n");
+                html.append("            <tr class=\"data-row\">\n");
                 
                 // Количество подов (rowspan только для первой строки)
                 if (isFirstRow) {
@@ -263,7 +273,7 @@ public class HtmlTableService {
         }
         
         // Итоговая строка (порядок: CpuRq, CpuLim, MemRq, MemLim, ...)
-        html.append("            <tr style=\"font-weight: bold; background-color: #e0e0e0;\">\n");
+        html.append("            <tr class=\"totals-row\" style=\"font-weight: bold; background-color: #e0e0e0;\">\n");
         html.append("                <td colspan=\"3\">Итого</td>\n");
         html.append("                <td>").append(sumCpuRq).append("</td>\n");
         html.append("                <td>").append(sumCpuLim).append("</td>\n");
@@ -281,6 +291,19 @@ public class HtmlTableService {
         
         html.append("        </tbody>\n");
         html.append("    </table>\n");
+        if (includeHeader) {
+            html.append("    <script>\n");
+            html.append("      (function() {\n");
+            html.append("        var rows = document.querySelectorAll('tbody tr.data-row');\n");
+            html.append("        rows.forEach(function(tr) {\n");
+            html.append("          tr.addEventListener('click', function(e) {\n");
+            html.append("            document.querySelectorAll('tbody tr.data-row.row-selected').forEach(function(r) { r.classList.remove('row-selected'); });\n");
+            html.append("            tr.classList.add('row-selected');\n");
+            html.append("          });\n");
+            html.append("        });\n");
+            html.append("      })();\n");
+            html.append("    </script>\n");
+        }
         html.append("</body>\n");
         html.append("</html>\n");
         
