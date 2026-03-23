@@ -25,8 +25,8 @@ public class HtmlParserService {
         
         String tbody = tbodyMatcher.group(1);
         
-        // Извлекаем все строки tr
-        Pattern trPattern = Pattern.compile("<tr>(.*?)</tr>", Pattern.DOTALL);
+        // Извлекаем все строки tr (с атрибутами class и т.д.)
+        Pattern trPattern = Pattern.compile("<tr([^>]*)>(.*?)</tr>", Pattern.DOTALL);
         Matcher trMatcher = trPattern.matcher(tbody);
         
         String currentDeploymentName = null;
@@ -35,7 +35,11 @@ public class HtmlParserService {
         int cellOffset = 0;
         
         while (trMatcher.find()) {
-            String row = trMatcher.group(1);
+            String trAttrs = trMatcher.group(1);
+            String row = trMatcher.group(2);
+            if (trAttrs != null && trAttrs.contains("totals-row")) {
+                continue;
+            }
             
             Pattern rowspanPattern = Pattern.compile("rowspan=\"(\\d+)\"");
             Matcher rowspanMatcher = rowspanPattern.matcher(row);

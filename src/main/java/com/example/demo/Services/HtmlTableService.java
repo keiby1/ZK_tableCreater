@@ -89,6 +89,9 @@ public class HtmlTableService {
         html.append("            background-color: #bbdefb;\n");
         html.append("            outline-color: #0d47a1;\n");
         html.append("        }\n");
+        html.append("        th.col-draggable { cursor: grab; user-select: none; }\n");
+        html.append("        th.col-draggable:active { cursor: grabbing; }\n");
+        html.append("        th.col-drag-over { box-shadow: inset 0 -4px 0 #ffeb3b; }\n");
         html.append("        .cpu-green { background-color: #c8e6c9; }\n");
         html.append("        .cpu-yellow { background-color: #fff9c4; }\n");
         html.append("        .cpu-red-light { background-color: #ffcdd2; }\n");
@@ -121,26 +124,26 @@ public class HtmlTableService {
         html.append("    <div class=\"interval-info\">\n");
         html.append("        Интервал выгрузки: ").append(formatInterval(from, to)).append("\n");
         html.append("    </div>\n");
-        html.append("    <table>\n");
+        html.append("    <table id=\"deployment-table\">\n");
         
-        // Заголовок таблицы
+        // Заголовок: 2 фикс. столбца + 12 переставляемых (data-block-key) + время старта
         html.append("        <thead>\n");
         html.append("            <tr>\n");
-        html.append("                <th>Количество подов</th>\n");
-        html.append("                <th>Workload</th>\n");
-        html.append("                <th>Container</th>\n");
-        html.append("                <th>CpuRq</th>\n");
-        html.append("                <th>CpuLim</th>\n");
-        html.append("                <th>MemRq</th>\n");
-        html.append("                <th>MemLim</th>\n");
-        html.append("                <th>CpuMaxUse</th>\n");
-        html.append("                <th>CpuAvgUse</th>\n");
-        html.append("                <th>CpuAbsUse</th>\n");
-        html.append("                <th>MemMaxUse</th>\n");
-        html.append("                <th>MemAvgUse</th>\n");
-        html.append("                <th>MemAbsUse</th>\n");
-        html.append("                <th>Троттлинг</th>\n");
-        html.append("                <th>Время старта</th>\n");
+        html.append("                <th data-fixed=\"left\">Количество подов</th>\n");
+        html.append("                <th data-fixed=\"left\">Workload</th>\n");
+        html.append("                <th data-block-key=\"container\" class=\"col-draggable\" title=\"Перетащите, чтобы поменять порядок столбцов\">Container</th>\n");
+        html.append("                <th data-block-key=\"cpuRq\" class=\"col-draggable\">CpuRq</th>\n");
+        html.append("                <th data-block-key=\"cpuLim\" class=\"col-draggable\">CpuLim</th>\n");
+        html.append("                <th data-block-key=\"memRq\" class=\"col-draggable\">MemRq</th>\n");
+        html.append("                <th data-block-key=\"memLim\" class=\"col-draggable\">MemLim</th>\n");
+        html.append("                <th data-block-key=\"cpuMaxUse\" class=\"col-draggable\">CpuMaxUse</th>\n");
+        html.append("                <th data-block-key=\"cpuAvgUse\" class=\"col-draggable\">CpuAvgUse</th>\n");
+        html.append("                <th data-block-key=\"cpuAbsUse\" class=\"col-draggable\">CpuAbsUse</th>\n");
+        html.append("                <th data-block-key=\"memMaxUse\" class=\"col-draggable\">MemMaxUse</th>\n");
+        html.append("                <th data-block-key=\"memAvgUse\" class=\"col-draggable\">MemAvgUse</th>\n");
+        html.append("                <th data-block-key=\"memAbsUse\" class=\"col-draggable\">MemAbsUse</th>\n");
+        html.append("                <th data-block-key=\"throttling\" class=\"col-draggable\">Троттлинг</th>\n");
+        html.append("                <th data-fixed=\"right\">Время старта</th>\n");
         html.append("            </tr>\n");
         html.append("        </thead>\n");
         html.append("        <tbody>\n");
@@ -193,7 +196,7 @@ public class HtmlTableService {
             String memRqClass = memRqOver ? "over-limit" : "";
             
             for (Container container : sortedContainers) {
-                html.append("            <tr class=\"data-row\">\n");
+                html.append("            <tr class=\"data-row ").append(isFirstRow ? "group-start" : "group-cont").append("\">\n");
                 
                 // Количество подов (rowspan только для первой строки)
                 if (isFirstRow) {
@@ -206,56 +209,51 @@ public class HtmlTableService {
                         .append(deployment.getName()).append("</td>\n");
                 }
                 
-                // Название контейнера
-                html.append("                <td>").append(container.getName()).append("</td>\n");
+                // Название контейнера (переставляемый блок)
+                html.append("                <td data-block-key=\"container\">").append(container.getName()).append("</td>\n");
                 
                 // CpuRq, CpuLim, MemRq, MemLim (порядок столбцов)
-                appendTd(html, container.getCpuRq(), cpuRqClass);
+                appendTd(html, container.getCpuRq(), cpuRqClass, "cpuRq");
                 sumCpuRq += container.getCpuRq();
-                appendTd(html, container.getCpuLim(), cpuLimClass);
+                appendTd(html, container.getCpuLim(), cpuLimClass, "cpuLim");
                 sumCpuLim += container.getCpuLim();
-                appendTd(html, container.getMemRq(), memRqClass);
+                appendTd(html, container.getMemRq(), memRqClass, "memRq");
                 sumMemRq += container.getMemRq();
-                appendTd(html, container.getMemLim(), memLimClass);
+                appendTd(html, container.getMemLim(), memLimClass, "memLim");
                 sumMemLim += container.getMemLim();
                 
                 // ЦПУ утилизация макс с цветовой подсветкой
                 String cpuMaxClass = getCpuColorClass(container.getCpuMaxPercent());
-                html.append("                <td class=\"").append(cpuMaxClass).append("\">")
-                    .append(container.getCpuMaxPercent()).append("%</td>\n");
+                appendTdPercent(html, container.getCpuMaxPercent(), cpuMaxClass, "cpuMaxUse");
                 sumCpuMaxUse += container.getCpuMaxPercent();
                 
                 // ЦПУ утилизация сред с цветовой подсветкой
                 String cpuAvgClass = getCpuColorClass(container.getCpuAvgPercent());
-                html.append("                <td class=\"").append(cpuAvgClass).append("\">")
-                    .append(container.getCpuAvgPercent()).append("%</td>\n");
+                appendTdPercent(html, container.getCpuAvgPercent(), cpuAvgClass, "cpuAvgUse");
                 sumCpuAvgUse += container.getCpuAvgPercent();
                 
                 // ЦПУ утилизация абс
-                html.append("                <td>").append(container.getCpuMaxAbs()).append("</td>\n");
+                appendTd(html, container.getCpuMaxAbs(), null, "cpuAbsUse");
                 sumCpuAbsUse += container.getCpuMaxAbs();
                 
                 // Утилизация памяти макс с цветовой подсветкой
                 String memMaxClass = getMemColorClass(container.getMemMaxPercent());
-                html.append("                <td class=\"").append(memMaxClass).append("\">")
-                    .append(container.getMemMaxPercent()).append("%</td>\n");
+                appendTdPercent(html, container.getMemMaxPercent(), memMaxClass, "memMaxUse");
                 sumMemMaxUse += container.getMemMaxPercent();
                 
                 // Утилизация памяти сред с цветовой подсветкой
                 String memAvgClass = getMemColorClass(container.getMemAvgPercent());
-                html.append("                <td class=\"").append(memAvgClass).append("\">")
-                    .append(container.getMemAvgPercent()).append("%</td>\n");
+                appendTdPercent(html, container.getMemAvgPercent(), memAvgClass, "memAvgUse");
                 sumMemAvgUse += container.getMemAvgPercent();
                 
                 // Утилизация памяти абс
-                html.append("                <td>").append(container.getMemMaxAbs()).append("</td>\n");
+                appendTd(html, container.getMemMaxAbs(), null, "memAbsUse");
                 sumMemAbsUse += container.getMemMaxAbs();
                 
-                // Троттлинг CPU (предпоследний столбец)
+                // Троттлинг CPU
                 int throttling = container.getThrottlingPercent();
                 String throttlingClass = getThrottlingColorClass(throttling);
-                html.append("                <td class=\"").append(throttlingClass).append("\">")
-                    .append(throttling).append("%</td>\n");
+                appendTdPercent(html, throttling, throttlingClass, "throttling");
                 sumThrottlingPercent += throttling;
                 
                 // Время старта (один столбец на деплоймент, rowspan)
@@ -272,20 +270,22 @@ public class HtmlTableService {
             }
         }
         
-        // Итоговая строка (порядок: CpuRq, CpuLim, MemRq, MemLim, ...)
+        // Итоговая строка: 2 фикс. ячейки + блок из 12 (как в строках данных) + время старта
         html.append("            <tr class=\"totals-row\" style=\"font-weight: bold; background-color: #e0e0e0;\">\n");
-        html.append("                <td colspan=\"3\">Итого</td>\n");
-        html.append("                <td>").append(sumCpuRq).append("</td>\n");
-        html.append("                <td>").append(sumCpuLim).append("</td>\n");
-        html.append("                <td>").append(sumMemRq).append("</td>\n");
-        html.append("                <td>").append(sumMemLim).append("</td>\n");
-        html.append("                <td>").append(Math.round((double)sumCpuMaxUse / totalContainers)).append("%</td>\n");
-        html.append("                <td>").append(Math.round((double)sumCpuAvgUse / totalContainers)).append("%</td>\n");
-        html.append("                <td>").append(sumCpuAbsUse).append("</td>\n");
-        html.append("                <td>").append(Math.round((double)sumMemMaxUse / totalContainers)).append("%</td>\n");
-        html.append("                <td>").append(Math.round((double)sumMemAvgUse / totalContainers)).append("%</td>\n");
-        html.append("                <td>").append(sumMemAbsUse).append("</td>\n");
-        html.append("                <td>").append(totalContainers > 0 ? Math.round((double) sumThrottlingPercent / totalContainers) + "%" : "—").append("</td>\n");
+        html.append("                <td>—</td>\n");
+        html.append("                <td>—</td>\n");
+        html.append("                <td data-block-key=\"container\">Итого</td>\n");
+        appendTd(html, sumCpuRq, null, "cpuRq");
+        appendTd(html, sumCpuLim, null, "cpuLim");
+        appendTd(html, sumMemRq, null, "memRq");
+        appendTd(html, sumMemLim, null, "memLim");
+        html.append("                <td data-block-key=\"cpuMaxUse\">").append(totalContainers > 0 ? Math.round((double) sumCpuMaxUse / totalContainers) + "%" : "—").append("</td>\n");
+        html.append("                <td data-block-key=\"cpuAvgUse\">").append(totalContainers > 0 ? Math.round((double) sumCpuAvgUse / totalContainers) + "%" : "—").append("</td>\n");
+        appendTd(html, sumCpuAbsUse, null, "cpuAbsUse");
+        html.append("                <td data-block-key=\"memMaxUse\">").append(totalContainers > 0 ? Math.round((double) sumMemMaxUse / totalContainers) + "%" : "—").append("</td>\n");
+        html.append("                <td data-block-key=\"memAvgUse\">").append(totalContainers > 0 ? Math.round((double) sumMemAvgUse / totalContainers) + "%" : "—").append("</td>\n");
+        appendTd(html, sumMemAbsUse, null, "memAbsUse");
+        html.append("                <td data-block-key=\"throttling\">").append(totalContainers > 0 ? Math.round((double) sumThrottlingPercent / totalContainers) + "%" : "—").append("</td>\n");
         html.append("                <td>—</td>\n");
         html.append("            </tr>\n");
         
@@ -294,6 +294,102 @@ public class HtmlTableService {
         if (includeHeader) {
             html.append("    <script>\n");
             html.append("      (function() {\n");
+            html.append("        var BLOCK_KEYS = ['container','cpuRq','cpuLim','memRq','memLim','cpuMaxUse','cpuAvgUse','cpuAbsUse','memMaxUse','memAvgUse','memAbsUse','throttling'];\n");
+            html.append("        var LS_KEY = 'zkDeploymentTableBlockOrder';\n");
+            html.append("        function getThBlock(table) {\n");
+            html.append("          return Array.prototype.slice.call(table.querySelectorAll('thead th[data-block-key]'));\n");
+            html.append("        }\n");
+            html.append("        function reorderBlockCells(tr, keys) {\n");
+            html.append("          var cells = [];\n");
+            html.append("          keys.forEach(function(k) {\n");
+            html.append("            var el = tr.querySelector('[data-block-key=\"' + k + '\"]');\n");
+            html.append("            if (el) cells.push(el);\n");
+            html.append("          });\n");
+            html.append("          if (cells.length !== BLOCK_KEYS.length) return;\n");
+            html.append("          var insertAfter = null;\n");
+            html.append("          if (tr.classList.contains('group-start')) {\n");
+            html.append("            insertAfter = tr.children[1];\n");
+            html.append("          } else if (tr.classList.contains('group-cont')) {\n");
+            html.append("            insertAfter = null;\n");
+            html.append("          } else if (tr.classList.contains('totals-row')) {\n");
+            html.append("            insertAfter = tr.children[1];\n");
+            html.append("          } else return;\n");
+            html.append("          cells.forEach(function(td) {\n");
+            html.append("            if (insertAfter) { tr.insertBefore(td, insertAfter.nextSibling); insertAfter = td; }\n");
+            html.append("            else { tr.insertBefore(td, tr.firstChild); insertAfter = td; }\n");
+            html.append("          });\n");
+            html.append("        }\n");
+            html.append("        function applyOrder(keys) {\n");
+            html.append("          var table = document.getElementById('deployment-table');\n");
+            html.append("          if (!table) return;\n");
+        html.append("          var theadTr = table.querySelector('thead tr');\n");
+        html.append("          var thByKey = {};\n");
+        html.append("          getThBlock(table).forEach(function(th) { thByKey[th.getAttribute('data-block-key')] = th; });\n");
+        html.append("          var refTh = theadTr.children[1];\n");
+        html.append("          keys.forEach(function(k) {\n");
+        html.append("            var th = thByKey[k];\n");
+        html.append("            if (th && refTh && th.parentNode === theadTr) {\n");
+        html.append("              theadTr.insertBefore(th, refTh.nextSibling);\n");
+        html.append("              refTh = th;\n");
+        html.append("            }\n");
+        html.append("          });\n");
+            html.append("          table.querySelectorAll('tbody tr.group-start').forEach(function(tr) { reorderBlockCells(tr, keys); });\n");
+            html.append("          table.querySelectorAll('tbody tr.group-cont').forEach(function(tr) { reorderBlockCells(tr, keys); });\n");
+            html.append("          var tot = table.querySelector('tr.totals-row');\n");
+            html.append("          if (tot) reorderBlockCells(tot, keys);\n");
+            html.append("        }\n");
+            html.append("        function loadOrder() {\n");
+            html.append("          try {\n");
+            html.append("            var raw = localStorage.getItem(LS_KEY);\n");
+            html.append("            if (!raw) return BLOCK_KEYS.slice();\n");
+            html.append("            var arr = JSON.parse(raw);\n");
+            html.append("            if (!Array.isArray(arr) || arr.length !== BLOCK_KEYS.length) return BLOCK_KEYS.slice();\n");
+            html.append("            var set = {};\n");
+            html.append("            arr.forEach(function(k) { if (BLOCK_KEYS.indexOf(k) >= 0) set[k] = true; });\n");
+            html.append("            if (Object.keys(set).length !== BLOCK_KEYS.length) return BLOCK_KEYS.slice();\n");
+            html.append("            return arr;\n");
+            html.append("          } catch (e) { return BLOCK_KEYS.slice(); }\n");
+            html.append("        }\n");
+            html.append("        function saveOrder(keys) {\n");
+            html.append("          try { localStorage.setItem(LS_KEY, JSON.stringify(keys)); } catch (e) {}\n");
+            html.append("        }\n");
+            html.append("        function initColumnDrag() {\n");
+            html.append("          var table = document.getElementById('deployment-table');\n");
+            html.append("          if (!table) return;\n");
+            html.append("          var dragKey = null;\n");
+            html.append("          getThBlock(table).forEach(function(th) {\n");
+            html.append("            th.setAttribute('draggable', 'true');\n");
+            html.append("            th.addEventListener('dragstart', function(e) {\n");
+            html.append("              dragKey = th.getAttribute('data-block-key');\n");
+            html.append("              e.dataTransfer.effectAllowed = 'move';\n");
+            html.append("              try { e.dataTransfer.setData('text/plain', dragKey); } catch (err) {}\n");
+            html.append("              th.classList.add('col-drag-over');\n");
+            html.append("            });\n");
+            html.append("            th.addEventListener('dragend', function() {\n");
+            html.append("              getThBlock(table).forEach(function(t) { t.classList.remove('col-drag-over'); });\n");
+            html.append("              dragKey = null;\n");
+            html.append("            });\n");
+            html.append("            th.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });\n");
+            html.append("            th.addEventListener('dragenter', function() { th.classList.add('col-drag-over'); });\n");
+            html.append("            th.addEventListener('dragleave', function() { th.classList.remove('col-drag-over'); });\n");
+            html.append("            th.addEventListener('drop', function(e) {\n");
+            html.append("              e.preventDefault();\n");
+            html.append("              var targetKey = th.getAttribute('data-block-key');\n");
+            html.append("              var srcKey = dragKey;\n");
+            html.append("              try { srcKey = e.dataTransfer.getData('text/plain') || dragKey; } catch (err2) {}\n");
+            html.append("              if (!srcKey || !targetKey || srcKey === targetKey) return;\n");
+            html.append("              var order = loadOrder();\n");
+            html.append("              var i = order.indexOf(srcKey), j = order.indexOf(targetKey);\n");
+            html.append("              if (i < 0 || j < 0) return;\n");
+            html.append("              order.splice(i, 1);\n");
+            html.append("              order.splice(j, 0, srcKey);\n");
+            html.append("              saveOrder(order);\n");
+            html.append("              applyOrder(order);\n");
+            html.append("            });\n");
+            html.append("          });\n");
+            html.append("        }\n");
+            html.append("        applyOrder(loadOrder());\n");
+            html.append("        initColumnDrag();\n");
             html.append("        var rows = document.querySelectorAll('tbody tr.data-row');\n");
             html.append("        rows.forEach(function(tr) {\n");
             html.append("          tr.addEventListener('click', function(e) {\n");
@@ -319,12 +415,21 @@ public class HtmlTableService {
         return "не указан";
     }
     
-    private void appendTd(StringBuilder html, long value, String cssClass) {
+    private void appendTd(StringBuilder html, long value, String cssClass, String dataBlockKey) {
+        String dk = (dataBlockKey != null && !dataBlockKey.isEmpty())
+                ? " data-block-key=\"" + dataBlockKey + "\"" : "";
         if (cssClass != null && !cssClass.isEmpty()) {
-            html.append("                <td class=\"").append(cssClass).append("\">").append(value).append("</td>\n");
+            html.append("                <td class=\"").append(cssClass).append("\"").append(dk).append(">").append(value).append("</td>\n");
         } else {
-            html.append("                <td>").append(value).append("</td>\n");
+            html.append("                <td").append(dk).append(">").append(value).append("</td>\n");
         }
+    }
+
+    private void appendTdPercent(StringBuilder html, int percent, String cssClass, String dataBlockKey) {
+        String dk = (dataBlockKey != null && !dataBlockKey.isEmpty())
+                ? " data-block-key=\"" + dataBlockKey + "\"" : "";
+        html.append("                <td class=\"").append(cssClass).append("\"").append(dk).append(">")
+                .append(percent).append("%</td>\n");
     }
 
     private String getCpuColorClass(int percent) {
