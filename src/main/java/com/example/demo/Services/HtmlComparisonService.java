@@ -108,7 +108,8 @@ public class HtmlComparisonService {
         html.append("                <th>MemLim</th>\n");
         html.append("                <th>CpuMaxUse</th>\n");
         html.append("                <th>CpuAvgUse</th>\n");
-        html.append("                <th>CpuAbsUse</th>\n");
+        html.append("                <th>CpuAvgAbsUse</th>\n");
+        html.append("                <th>CpuMaxAbsUse</th>\n");
         html.append("                <th>MemMaxUse</th>\n");
         html.append("                <th>MemAvgUse</th>\n");
         html.append("                <th>MemAbsUse</th>\n");
@@ -168,7 +169,8 @@ public class HtmlComparisonService {
                 appendCompareCell(html, container1.getMemLim(), container2 != null ? container2.getMemLim() : null, "");
                 appendCompareCell(html, container1.getCpuMaxPercent(), container2 != null ? container2.getCpuMaxPercent() : null, "%");
                 appendCompareCell(html, container1.getCpuAvgPercent(), container2 != null ? container2.getCpuAvgPercent() : null, "%");
-                appendCompareCell(html, container1.getCpuMaxAbs(), container2 != null ? container2.getCpuMaxAbs() : null, "");
+                appendCompareCell(html, container1.getCpuAvgAbsUse(), container2 != null ? container2.getCpuAvgAbsUse() : null, "");
+                appendCompareCell(html, container1.getCpuMaxAbsUse(), container2 != null ? container2.getCpuMaxAbsUse() : null, "");
                 appendCompareCell(html, container1.getMemMaxPercent(), container2 != null ? container2.getMemMaxPercent() : null, "%");
                 appendCompareCell(html, container1.getMemAvgPercent(), container2 != null ? container2.getMemAvgPercent() : null, "%");
                 appendCompareCell(html, container1.getMemMaxAbs(), container2 != null ? container2.getMemMaxAbs() : null, "");

@@ -243,7 +243,8 @@ public class MainController {
         container1_1.setMemLim(512);
         container1_1.setCpuMaxPercent(65);
         container1_1.setCpuAvgPercent(45);
-        container1_1.setCpuMaxAbs(325);
+        container1_1.setCpuAvgAbsUse(225);
+        container1_1.setCpuMaxAbsUse(325);
         container1_1.setMemMaxPercent(70);
         container1_1.setMemAvgPercent(55);
         container1_1.setMemMaxAbs(358);
@@ -258,7 +259,8 @@ public class MainController {
         container1_2.setMemLim(1024);
         container1_2.setCpuMaxPercent(35);
         container1_2.setCpuAvgPercent(25);
-        container1_2.setCpuMaxAbs(350);
+        container1_2.setCpuAvgAbsUse(180);
+        container1_2.setCpuMaxAbsUse(350);
         container1_2.setMemMaxPercent(45);
         container1_2.setMemAvgPercent(30);
         container1_2.setMemMaxAbs(460);
@@ -273,7 +275,8 @@ public class MainController {
         container1_3.setMemLim(256);
         container1_3.setCpuMaxPercent(15);
         container1_3.setCpuAvgPercent(10);
-        container1_3.setCpuMaxAbs(30);
+        container1_3.setCpuAvgAbsUse(12);
+        container1_3.setCpuMaxAbsUse(30);
         container1_3.setMemMaxPercent(85);
         container1_3.setMemAvgPercent(75);
         container1_3.setMemMaxAbs(217);
@@ -297,7 +300,8 @@ public class MainController {
         container2_1.setMemLim(2048);
         container2_1.setCpuMaxPercent(75);
         container2_1.setCpuAvgPercent(60);
-        container2_1.setCpuMaxAbs(1125);
+        container2_1.setCpuAvgAbsUse(900);
+        container2_1.setCpuMaxAbsUse(1125);
         container2_1.setMemMaxPercent(68);
         container2_1.setMemAvgPercent(50);
         container2_1.setMemMaxAbs(1392);
@@ -312,7 +316,8 @@ public class MainController {
         container2_2.setMemLim(4096);
         container2_2.setCpuMaxPercent(40);
         container2_2.setCpuAvgPercent(30);
-        container2_2.setCpuMaxAbs(800);
+        container2_2.setCpuAvgAbsUse(420);
+        container2_2.setCpuMaxAbsUse(800);
         container2_2.setMemMaxPercent(55);
         container2_2.setMemAvgPercent(40);
         container2_2.setMemMaxAbs(2252);
@@ -327,7 +332,8 @@ public class MainController {
         container2_3.setMemLim(1024);
         container2_3.setCpuMaxPercent(90);
         container2_3.setCpuAvgPercent(70);
-        container2_3.setCpuMaxAbs(720);
+        container2_3.setCpuAvgAbsUse(560);
+        container2_3.setCpuMaxAbsUse(720);
         container2_3.setMemMaxPercent(25);
         container2_3.setMemAvgPercent(15);
         container2_3.setMemMaxAbs(256);
@@ -351,7 +357,8 @@ public class MainController {
         container3_1.setMemLim(2048);
         container3_1.setCpuMaxPercent(62);
         container3_1.setCpuAvgPercent(48);
-        container3_1.setCpuMaxAbs(620);
+        container3_1.setCpuAvgAbsUse(450);
+        container3_1.setCpuMaxAbsUse(620);
         container3_1.setMemMaxPercent(58);
         container3_1.setMemAvgPercent(42);
         container3_1.setMemMaxAbs(1187);
@@ -366,7 +373,8 @@ public class MainController {
         container3_2.setMemLim(1024);
         container3_2.setCpuMaxPercent(18);
         container3_2.setCpuAvgPercent(12);
-        container3_2.setCpuMaxAbs(90);
+        container3_2.setCpuAvgAbsUse(55);
+        container3_2.setCpuMaxAbsUse(90);
         container3_2.setMemMaxPercent(72);
         container3_2.setMemAvgPercent(58);
         container3_2.setMemMaxAbs(737);
@@ -381,7 +389,8 @@ public class MainController {
         container3_3.setMemLim(512);
         container3_3.setCpuMaxPercent(50);
         container3_3.setCpuAvgPercent(35);
-        container3_3.setCpuMaxAbs(100);
+        container3_3.setCpuAvgAbsUse(70);
+        container3_3.setCpuMaxAbsUse(100);
         container3_3.setMemMaxPercent(95);
         container3_3.setMemAvgPercent(80);
         container3_3.setMemMaxAbs(486);

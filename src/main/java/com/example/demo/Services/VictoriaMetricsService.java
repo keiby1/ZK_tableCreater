@@ -496,16 +496,18 @@ public class VictoriaMetricsService {
             }
         }
 
-        // Абсолютные значения: макс использование в millicores и MB
-        double cpuMaxAbs = 0, memMaxAbs = 0;
+        // Абсолютные значения: сред/макс использование в millicores и MB
+        double cpuAvgAbs = 0, cpuMaxAbs = 0, memMaxAbs = 0;
         for (ContainerKey ck : keys) {
             UsageValues uv = usage.get(ck);
             if (uv != null) {
+                cpuAvgAbs = Math.max(cpuAvgAbs, uv.cpuAvgCores * 1000);
                 cpuMaxAbs = Math.max(cpuMaxAbs, uv.cpuMaxCores * 1000);
                 memMaxAbs = Math.max(memMaxAbs, uv.memMaxBytes / (1024 * 1024));
             }
         }
-        c.setCpuMaxAbs((int) Math.round(cpuMaxAbs));
+        c.setCpuAvgAbsUse((int) Math.round(cpuAvgAbs));
+        c.setCpuMaxAbsUse((int) Math.round(cpuMaxAbs));
         c.setMemMaxAbs((int) Math.round(memMaxAbs));
 
         // Троттлинг: макс % по подам (один контейнер может быть в нескольких подах)

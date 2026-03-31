@@ -17,7 +17,10 @@ public class Container {
     int MemLim;
     int CpuMaxPercent;
     int CpuAvgPercent;
-    int CpuMaxAbs;
+    /** Среднее потребление CPU за интервал (millicores). */
+    int CpuAvgAbsUse;
+    /** Максимальное потребление CPU за интервал (millicores). */
+    int CpuMaxAbsUse;
     int MemMaxPercent;
     int MemAvgPercent;
     int MemMaxAbs;

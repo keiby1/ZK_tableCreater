@@ -126,7 +126,7 @@ public class HtmlTableService {
         html.append("    </div>\n");
         html.append("    <table id=\"deployment-table\">\n");
         
-        // Заголовок: 2 фикс. столбца + 12 переставляемых (data-block-key) + время старта
+        // Заголовок: 2 фикс. столбца + переставляемый блок (data-block-key) + время старта
         html.append("        <thead>\n");
         html.append("            <tr>\n");
         html.append("                <th data-fixed=\"left\">Количество подов</th>\n");
@@ -138,7 +138,8 @@ public class HtmlTableService {
         html.append("                <th data-block-key=\"memLim\" class=\"col-draggable\">MemLim</th>\n");
         html.append("                <th data-block-key=\"cpuMaxUse\" class=\"col-draggable\">CpuMaxUse</th>\n");
         html.append("                <th data-block-key=\"cpuAvgUse\" class=\"col-draggable\">CpuAvgUse</th>\n");
-        html.append("                <th data-block-key=\"cpuAbsUse\" class=\"col-draggable\">CpuAbsUse</th>\n");
+        html.append("                <th data-block-key=\"cpuAvgAbsUse\" class=\"col-draggable\">CpuAvgAbsUse</th>\n");
+        html.append("                <th data-block-key=\"cpuMaxAbsUse\" class=\"col-draggable\">CpuMaxAbsUse</th>\n");
         html.append("                <th data-block-key=\"memMaxUse\" class=\"col-draggable\">MemMaxUse</th>\n");
         html.append("                <th data-block-key=\"memAvgUse\" class=\"col-draggable\">MemAvgUse</th>\n");
         html.append("                <th data-block-key=\"memAbsUse\" class=\"col-draggable\">MemAbsUse</th>\n");
@@ -153,7 +154,8 @@ public class HtmlTableService {
         long sumCpuRq = 0;
         long sumMemLim = 0;
         long sumMemRq = 0;
-        long sumCpuAbsUse = 0;
+        long sumCpuAvgAbsUse = 0;
+        long sumCpuMaxAbsUse = 0;
         long sumMemAbsUse = 0;
         long sumCpuMaxUse = 0;
         long sumCpuAvgUse = 0;
@@ -232,9 +234,11 @@ public class HtmlTableService {
                 appendTdPercent(html, container.getCpuAvgPercent(), cpuAvgClass, "cpuAvgUse");
                 sumCpuAvgUse += container.getCpuAvgPercent();
                 
-                // ЦПУ утилизация абс
-                appendTd(html, container.getCpuMaxAbs(), null, "cpuAbsUse");
-                sumCpuAbsUse += container.getCpuMaxAbs();
+                // ЦПУ утилизация абс (avg/max) в millicores
+                appendTd(html, container.getCpuAvgAbsUse(), null, "cpuAvgAbsUse");
+                sumCpuAvgAbsUse += container.getCpuAvgAbsUse();
+                appendTd(html, container.getCpuMaxAbsUse(), null, "cpuMaxAbsUse");
+                sumCpuMaxAbsUse += container.getCpuMaxAbsUse();
                 
                 // Утилизация памяти макс с цветовой подсветкой
                 String memMaxClass = getMemColorClass(container.getMemMaxPercent());
@@ -270,7 +274,7 @@ public class HtmlTableService {
             }
         }
         
-        // Итоговая строка: 2 фикс. ячейки + блок из 12 (как в строках данных) + время старта
+        // Итоговая строка: 2 фикс. ячейки + блок (как в строках данных) + время старта
         html.append("            <tr class=\"totals-row\" style=\"font-weight: bold; background-color: #e0e0e0;\">\n");
         html.append("                <td>—</td>\n");
         html.append("                <td>—</td>\n");
@@ -281,7 +285,8 @@ public class HtmlTableService {
         appendTd(html, sumMemLim, null, "memLim");
         html.append("                <td data-block-key=\"cpuMaxUse\">").append(totalContainers > 0 ? Math.round((double) sumCpuMaxUse / totalContainers) + "%" : "—").append("</td>\n");
         html.append("                <td data-block-key=\"cpuAvgUse\">").append(totalContainers > 0 ? Math.round((double) sumCpuAvgUse / totalContainers) + "%" : "—").append("</td>\n");
-        appendTd(html, sumCpuAbsUse, null, "cpuAbsUse");
+        appendTd(html, sumCpuAvgAbsUse, null, "cpuAvgAbsUse");
+        appendTd(html, sumCpuMaxAbsUse, null, "cpuMaxAbsUse");
         html.append("                <td data-block-key=\"memMaxUse\">").append(totalContainers > 0 ? Math.round((double) sumMemMaxUse / totalContainers) + "%" : "—").append("</td>\n");
         html.append("                <td data-block-key=\"memAvgUse\">").append(totalContainers > 0 ? Math.round((double) sumMemAvgUse / totalContainers) + "%" : "—").append("</td>\n");
         appendTd(html, sumMemAbsUse, null, "memAbsUse");
@@ -294,7 +299,7 @@ public class HtmlTableService {
         if (includeHeader) {
             html.append("    <script>\n");
             html.append("      (function() {\n");
-            html.append("        var BLOCK_KEYS = ['container','cpuRq','cpuLim','memRq','memLim','cpuMaxUse','cpuAvgUse','cpuAbsUse','memMaxUse','memAvgUse','memAbsUse','throttling'];\n");
+            html.append("        var BLOCK_KEYS = ['container','cpuRq','cpuLim','memRq','memLim','cpuMaxUse','cpuAvgUse','cpuAvgAbsUse','cpuMaxAbsUse','memMaxUse','memAvgUse','memAbsUse','throttling'];\n");
             html.append("        var LS_KEY = 'zkDeploymentTableBlockOrder';\n");
             html.append("        function getThBlock(table) {\n");
             html.append("          return Array.prototype.slice.call(table.querySelectorAll('thead th[data-block-key]'));\n");
