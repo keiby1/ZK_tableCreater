@@ -3,6 +3,7 @@ package com.example.demo.Controllers;
 import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
 import com.example.demo.Services.AppLayoutService;
+import com.example.demo.Services.ExcelTableService;
 import com.example.demo.Services.HtmlComparisonService;
 import com.example.demo.Services.HtmlParserService;
 import com.example.demo.Services.HtmlTableService;
@@ -41,6 +42,9 @@ public class MainController {
 
     @Autowired
     private AppLayoutService appLayoutService;
+
+    @Autowired
+    private ExcelTableService excelTableService;
     
     @RequestMapping("/ping")
     public String test(){
@@ -72,6 +76,26 @@ public class MainController {
         headers.setContentDispositionFormData("attachment", "deployment_table.html");
 
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Те же параметры и сбор данных, что и /get, но результат — файл Excel (.xlsx) для скачивания.
+     */
+    @GetMapping("/getExcel")
+    public ResponseEntity<byte[]> getExcel(
+            @RequestParam(name = "useMetrics", defaultValue = "false") boolean useMetrics,
+            @RequestParam(name = "namespace", required = false) String namespace,
+            @RequestParam(name = "from", required = false) Long from,
+            @RequestParam(name = "to", required = false) Long to) {
+        List<Deployment> deployments = useMetrics
+                ? victoriaMetricsService.fetchDeployments(namespace, from, to)
+                : generateTestData();
+        byte[] xlsx = excelTableService.buildDeploymentTableXlsx(deployments, from, to);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment", "deployment_table.xlsx");
+        return new ResponseEntity<>(xlsx, headers, HttpStatus.OK);
     }
 
     /**

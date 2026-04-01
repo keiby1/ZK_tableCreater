@@ -18,6 +18,7 @@ public class AppLayoutService {
                 + "      <nav class=\"app-nav\">\n"
                 + "        <a id=\"app-nav-json\" href=\"/getJson\" class=\"app-nav-link\" target=\"_blank\">Сохранить JSON</a>\n"
                 + "        <a id=\"app-nav-html\" href=\"/getHtml\" class=\"app-nav-link\">Сохранить HTML в файл</a>\n"
+                + "        <a id=\"app-nav-excel\" href=\"/getExcel\" class=\"app-nav-link\">Сохранить Excel</a>\n"
                 + "        <a href=\"/compare\" class=\"app-nav-link\">Сравнить</a>\n"
                 + "      </nav>\n"
                 + "      <div class=\"app-legend\">\n"
@@ -58,8 +59,10 @@ public class AppLayoutService {
                 + "        var q = window.location.search || '';\n"
                 + "        var jsonLink = document.getElementById('app-nav-json');\n"
                 + "        var htmlLink = document.getElementById('app-nav-html');\n"
+                + "        var excelLink = document.getElementById('app-nav-excel');\n"
                 + "        if (jsonLink) jsonLink.setAttribute('href', '/getJson' + q);\n"
                 + "        if (htmlLink) htmlLink.setAttribute('href', '/getHtml' + q);\n"
+                + "        if (excelLink) excelLink.setAttribute('href', '/getExcel' + q);\n"
                 + "      })();\n"
                 + "    </script>\n";
     }

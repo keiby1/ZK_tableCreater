@@ -411,6 +411,11 @@ public class HtmlTableService {
         return html.toString();
     }
 
+    /** Текст интервала выгрузки (как в блоке «Интервал выгрузки» на странице таблицы). */
+    public String getIntervalLabel(Long from, Long to) {
+        return formatInterval(from, to);
+    }
+
     private String formatInterval(Long from, Long to) {
         if (from != null && to != null) {
             String fromStr = INTERVAL_FORMAT.format(Instant.ofEpochMilli(from));
