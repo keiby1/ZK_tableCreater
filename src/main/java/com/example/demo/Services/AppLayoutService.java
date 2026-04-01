@@ -16,9 +16,8 @@ public class AppLayoutService {
         return ""
                 + "    <header class=\"app-header\">\n"
                 + "      <nav class=\"app-nav\">\n"
-                + "        <a href=\"/get\" class=\"app-nav-link\">Таблица</a>\n"
-                + "        <a href=\"/getJson\" class=\"app-nav-link\" target=\"_blank\">Получить JSON</a>\n"
-                + "        <a href=\"/getHtml\" class=\"app-nav-link\">Сохранить HTML в файл</a>\n"
+                + "        <a id=\"app-nav-json\" href=\"/getJson\" class=\"app-nav-link\" target=\"_blank\">Сохранить JSON</a>\n"
+                + "        <a id=\"app-nav-html\" href=\"/getHtml\" class=\"app-nav-link\">Сохранить HTML в файл</a>\n"
                 + "        <a href=\"/compare\" class=\"app-nav-link\">Сравнить</a>\n"
                 + "      </nav>\n"
                 + "      <div class=\"app-legend\">\n"
@@ -44,7 +43,7 @@ public class AppLayoutService {
                 + "      .app-nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }\n"
                 + "      .app-nav-link { display: inline-block; padding: 8px 16px; background: #4CAF50; color: #fff; text-decoration: none; border-radius: 6px; font-size: 0.95em; }\n"
                 + "      .app-nav-link:hover { background: #43A047; }\n"
-                + "      .app-nav-link:first-of-type { margin-right: 8px; }\n"
+                + "      .app-nav-link:first-of-type { margin-right: 0; }\n"
                 + "      .app-legend { margin-top: 8px; padding: 10px 0 0 0; border-top: 1px solid #eee; }\n"
                 + "      .app-legend details summary { cursor: pointer; font-weight: bold; color: #424242; list-style: none; }\n"
                 + "      .app-legend details summary::-webkit-details-marker { display: none; }\n"
@@ -53,6 +52,15 @@ public class AppLayoutService {
                 + "      .app-legend ul { margin: 6px 0 0 0; padding-left: 20px; font-size: 0.9em; }\n"
                 + "      .app-legend li { margin: 2px 0; }\n"
                 + "      .app-legend .swatch { display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: middle; border: 1px solid #bdbdbd; border-radius: 2px; }\n"
-                + "    </style>\n";
+                + "    </style>\n"
+                + "    <script>\n"
+                + "      (function() {\n"
+                + "        var q = window.location.search || '';\n"
+                + "        var jsonLink = document.getElementById('app-nav-json');\n"
+                + "        var htmlLink = document.getElementById('app-nav-html');\n"
+                + "        if (jsonLink) jsonLink.setAttribute('href', '/getJson' + q);\n"
+                + "        if (htmlLink) htmlLink.setAttribute('href', '/getHtml' + q);\n"
+                + "      })();\n"
+                + "    </script>\n";
     }
 }
