@@ -82,7 +82,7 @@ public class MainController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
-        headers.setContentDispositionFormData("attachment", "deployment_table.html");
+        headers.setContentDispositionFormData("attachment", buildK8sExportFilename(namespace, from, to, "html"));
 
         return new ResponseEntity<>(html, headers, HttpStatus.OK);
     }
@@ -103,8 +103,28 @@ public class MainController {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-        headers.setContentDispositionFormData("attachment", "deployment_table.xlsx");
+        headers.setContentDispositionFormData("attachment", buildK8sExportFilename(namespace, from, to, "xlsx"));
         return new ResponseEntity<>(xlsx, headers, HttpStatus.OK);
+    }
+
+    private static String buildK8sExportFilename(String namespace, Long from, Long to, String extension) {
+        String ns = (namespace == null || namespace.isBlank()) ? "all" : sanitizeFilenameToken(namespace);
+        String interval;
+        if (from != null && to != null) {
+            interval = from + "-" + to;
+        } else if (from != null) {
+            interval = "from-" + from;
+        } else if (to != null) {
+            interval = "to-" + to;
+        } else {
+            interval = "allTime";
+        }
+        return ns + "_" + interval + "." + extension;
+    }
+
+    private static String sanitizeFilenameToken(String s) {
+        // Keep it OS/browser friendly for Content-Disposition filename=
+        return s.trim().replaceAll("[^A-Za-z0-9._-]+", "-");
     }
 
     /**
