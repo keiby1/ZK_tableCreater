@@ -2,11 +2,14 @@ package com.example.demo.Controllers;
 
 import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
+import com.example.demo.DTO.LinuxServerMetrics;
 import com.example.demo.Services.AppLayoutService;
 import com.example.demo.Services.ExcelTableService;
 import com.example.demo.Services.HtmlComparisonService;
 import com.example.demo.Services.HtmlParserService;
 import com.example.demo.Services.HtmlTableService;
+import com.example.demo.Services.LinuxServersHtmlService;
+import com.example.demo.Services.NodeExporterMetricsService;
 import com.example.demo.Services.VictoriaMetricsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -45,6 +48,12 @@ public class MainController {
 
     @Autowired
     private ExcelTableService excelTableService;
+
+    @Autowired
+    private NodeExporterMetricsService nodeExporterMetricsService;
+
+    @Autowired
+    private LinuxServersHtmlService linuxServersHtmlService;
     
     @RequestMapping("/ping")
     public String test(){
@@ -138,6 +147,37 @@ public class MainController {
                 ? victoriaMetricsService.fetchDeployments(namespace, from, to)
                 : generateTestData();
         return ResponseEntity.ok(deployments);
+    }
+
+    /**
+     * Таблица в браузере: средняя и максимальная утилизация CPU и RAM по Linux-хостам (метрики node_exporter в VictoriaMetrics).
+     * @param instances фильтр по лейблу {@code instance} (hostname:port и т.д.): повторяющийся параметр или список через запятую;
+     *                  пусто — все хосты с метриками
+     * @param from      начало интервала (UTC, мс), вместе с {@code to} задаёт окно агрегации
+     * @param to        конец интервала (UTC, мс)
+     */
+    @GetMapping("/servers")
+    public ResponseEntity<String> servers(
+            @RequestParam(name = "instances", required = false) List<String> instances,
+            @RequestParam(name = "from", required = false) Long from,
+            @RequestParam(name = "to", required = false) Long to) {
+        List<LinuxServerMetrics> rows = nodeExporterMetricsService.fetchLinuxServerMetrics(instances, from, to);
+        String html = linuxServersHtmlService.generatePage(rows, from, to);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+        return new ResponseEntity<>(html, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Те же параметры, что {@code /servers}, ответ — JSON (для сохранения текущей выгрузки).
+     */
+    @GetMapping(value = "/serversJson", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<LinuxServerMetrics>> serversJson(
+            @RequestParam(name = "instances", required = false) List<String> instances,
+            @RequestParam(name = "from", required = false) Long from,
+            @RequestParam(name = "to", required = false) Long to) {
+        List<LinuxServerMetrics> rows = nodeExporterMetricsService.fetchLinuxServerMetrics(instances, from, to);
+        return ResponseEntity.ok(rows);
     }
 
     /**
