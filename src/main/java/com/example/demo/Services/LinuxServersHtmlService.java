@@ -50,6 +50,9 @@ public class LinuxServersHtmlService {
         html.append("    <table>\n");
         html.append("        <thead><tr>\n");
         html.append("            <th>instance</th>\n");
+        html.append("            <th>CPU cores</th>\n");
+        html.append("            <th>RAM total</th>\n");
+        html.append("            <th>Linux release</th>\n");
         html.append("            <th>CpuAvgUse %</th>\n");
         html.append("            <th>CpuMaxUse %</th>\n");
         html.append("            <th>MemAvgUse %</th>\n");
@@ -59,6 +62,10 @@ public class LinuxServersHtmlService {
         for (LinuxServerMetrics r : rows) {
             html.append("            <tr>\n");
             html.append("                <td style=\"text-align:left\">").append(escapeHtml(r.getInstance())).append("</td>\n");
+            html.append("                <td>").append(formatNullableInt(r.getCpuCores())).append("</td>\n");
+            html.append("                <td style=\"text-align:left\">").append(escapeHtml(formatMemTotal(r.getMemTotalBytes()))).append("</td>\n");
+            html.append("                <td style=\"text-align:left;font-size:0.92em\">")
+                    .append(escapeHtml(r.getLinuxRelease() != null ? r.getLinuxRelease() : "—")).append("</td>\n");
             html.append("                <td>").append(r.getCpuAvgPercent()).append("</td>\n");
             html.append("                <td>").append(r.getCpuMaxPercent()).append("</td>\n");
             html.append("                <td>").append(r.getMemAvgPercent()).append("</td>\n");
@@ -66,7 +73,7 @@ public class LinuxServersHtmlService {
             html.append("            </tr>\n");
         }
         if (rows.isEmpty()) {
-            html.append("            <tr><td colspan=\"5\" style=\"padding:24px;color:#666;\">Нет данных по запросу ");
+            html.append("            <tr><td colspan=\"8\" style=\"padding:24px;color:#666;\">Нет данных по запросу ");
             html.append("(проверьте интервал, фильтр <code>instances</code> и наличие метрик node_exporter).</td></tr>\n");
         }
         html.append("        </tbody>\n");
@@ -90,5 +97,21 @@ public class LinuxServersHtmlService {
             return "";
         }
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    private static String formatNullableInt(Integer n) {
+        return n == null ? "—" : String.valueOf(n);
+    }
+
+    /** Человекочитаемый объём RAM; в JSON остаётся {@code memTotalBytes}. */
+    private static String formatMemTotal(Long bytes) {
+        if (bytes == null || bytes <= 0) {
+            return "—";
+        }
+        double gib = bytes / (1024.0 * 1024.0 * 1024.0);
+        if (gib >= 100) {
+            return String.format("%.0f GiB (%d B)", gib, bytes);
+        }
+        return String.format("%.1f GiB (%d B)", gib, bytes);
     }
 }

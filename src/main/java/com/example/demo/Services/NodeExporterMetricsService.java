@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -63,6 +64,17 @@ public class NodeExporterMetricsService {
         fillByInstance(byInstance, qMemAvg, LinuxServerMetrics::setMemAvgPercent, evaluationTimeSec);
         fillByInstance(byInstance, qMemMax, LinuxServerMetrics::setMemMaxPercent, evaluationTimeSec);
 
+        String qCpuCores = "count without (cpu, mode) (" + cpuIdleSelector(filter) + ")";
+        fillNumericByInstance(byInstance, qCpuCores, evaluationTimeSec,
+                (row, v) -> row.setCpuCores((int) Math.round(v)));
+
+        String qMemTotal = memTotalSelector(filter);
+        fillNumericByInstance(byInstance, qMemTotal, evaluationTimeSec,
+                (row, v) -> row.setMemTotalBytes(Math.round(v)));
+
+        String qUname = unameSelector(filter);
+        fillReleaseByInstance(byInstance, qUname, evaluationTimeSec);
+
         List<LinuxServerMetrics> rows = new ArrayList<>(byInstance.values());
         rows.sort(Comparator.comparing(LinuxServerMetrics::getInstance, Comparator.nullsLast(String::compareTo)));
         return rows;
@@ -109,6 +121,21 @@ public class NodeExporterMetricsService {
         return "(1 - (node_memory_MemAvailable_bytes" + br + " / node_memory_MemTotal_bytes" + br + ")) * 100";
     }
 
+    private static String memTotalSelector(List<String> instances) {
+        if (instances.isEmpty()) {
+            return "node_memory_MemTotal_bytes";
+        }
+        String br = "{" + LABEL_INSTANCE + "=~\"" + instanceRegexOr(instances) + "\"}";
+        return "node_memory_MemTotal_bytes" + br;
+    }
+
+    private static String unameSelector(List<String> instances) {
+        if (instances.isEmpty()) {
+            return "node_uname_info";
+        }
+        return "node_uname_info{" + LABEL_INSTANCE + "=~\"" + instanceRegexOr(instances) + "\"}";
+    }
+
     private static String instanceRegexOr(List<String> instances) {
         return instances.stream().map(Pattern::quote).collect(Collectors.joining("|"));
     }
@@ -135,6 +162,53 @@ public class NodeExporterMetricsService {
                 return m;
             });
             setter.set(row, pct);
+        }
+    }
+
+    private void fillNumericByInstance(Map<String, LinuxServerMetrics> byInstance, String query, Long evaluationTimeSec,
+                                       BiConsumer<LinuxServerMetrics, Double> setter) {
+        PrometheusResponse resp = client.query(query, evaluationTimeSec);
+        if (resp == null || resp.getData() == null || resp.getData().getResult() == null) {
+            return;
+        }
+        for (PrometheusResponse.Result r : resp.getData().getResult()) {
+            String inst = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_INSTANCE);
+            if (inst == null || inst.isEmpty()) {
+                continue;
+            }
+            double v = VictoriaMetricsClient.parseValue(r.getValue());
+            if (Double.isNaN(v) || Double.isInfinite(v)) {
+                continue;
+            }
+            LinuxServerMetrics row = byInstance.computeIfAbsent(inst, i -> {
+                LinuxServerMetrics m = new LinuxServerMetrics();
+                m.setInstance(i);
+                return m;
+            });
+            setter.accept(row, v);
+        }
+    }
+
+    private void fillReleaseByInstance(Map<String, LinuxServerMetrics> byInstance, String query, Long evaluationTimeSec) {
+        PrometheusResponse resp = client.query(query, evaluationTimeSec);
+        if (resp == null || resp.getData() == null || resp.getData().getResult() == null) {
+            return;
+        }
+        for (PrometheusResponse.Result r : resp.getData().getResult()) {
+            String inst = VictoriaMetricsClient.getLabel(r.getMetric(), LABEL_INSTANCE);
+            if (inst == null || inst.isEmpty()) {
+                continue;
+            }
+            String release = VictoriaMetricsClient.getLabel(r.getMetric(), "release");
+            if (release == null || release.isEmpty()) {
+                continue;
+            }
+            LinuxServerMetrics row = byInstance.computeIfAbsent(inst, i -> {
+                LinuxServerMetrics m = new LinuxServerMetrics();
+                m.setInstance(i);
+                return m;
+            });
+            row.setLinuxRelease(release);
         }
     }
 
