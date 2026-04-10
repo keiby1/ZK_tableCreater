@@ -3,6 +3,7 @@ package com.example.demo.Controllers;
 import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
 import com.example.demo.DTO.LinuxServerMetrics;
+import com.example.demo.DTO.PostgresQueryMetrics;
 import com.example.demo.Services.AppLayoutService;
 import com.example.demo.Services.ExcelTableService;
 import com.example.demo.Services.HtmlComparisonService;
@@ -10,6 +11,8 @@ import com.example.demo.Services.HtmlParserService;
 import com.example.demo.Services.HtmlTableService;
 import com.example.demo.Services.LinuxServersHtmlService;
 import com.example.demo.Services.NodeExporterMetricsService;
+import com.example.demo.Services.PostgresDbChecksHtmlService;
+import com.example.demo.Services.PostgresDbChecksMetricsService;
 import com.example.demo.Services.VictoriaMetricsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -54,6 +57,12 @@ public class MainController {
 
     @Autowired
     private LinuxServersHtmlService linuxServersHtmlService;
+
+    @Autowired
+    private PostgresDbChecksMetricsService postgresDbChecksMetricsService;
+
+    @Autowired
+    private PostgresDbChecksHtmlService postgresDbChecksHtmlService;
     
     @RequestMapping("/ping")
     public String test(){
@@ -172,8 +181,7 @@ public class MainController {
     /**
      * Таблица в браузере: средняя и максимальная утилизация CPU и RAM по Linux-хостам (метрики node_exporter в VictoriaMetrics).
      * @param instances    устаревший параметр фильтра по лейблу {@code instance}; оставлен для обратной совместимости
-     * @param varInstances параметр Grafana-переменной: {@code var-instance}. Может приходить без порта (например {@code host}),
-     *                     порт будет подставлен на стороне сервиса.
+     * @param varInstances параметр Grafana-переменной: {@code var-instance} (значение лейбла {@code instance})
      * @param from      начало интервала (UTC, мс), вместе с {@code to} задаёт окно агрегации
      * @param to        конец интервала (UTC, мс)
      */
@@ -217,6 +225,43 @@ public class MainController {
             out.addAll(b);
         }
         return out;
+    }
+
+    /**
+     * Проверки БД (PostgreSQL): таблица запросов по серверам БД с avg/max количеством запросов.
+     *
+     * Параметры фильтра:
+     * - {@code var-server} / {@code servers}: список серверов БД (лейбл {@code server})
+     * - {@code job}: опционально фильтр по job
+     */
+    @GetMapping("/dbChecks")
+    public ResponseEntity<String> dbChecks(
+            @RequestParam(name = "servers", required = false) List<String> servers,
+            @RequestParam(name = "var-server", required = false) List<String> varServers,
+            @RequestParam(name = "job", required = false) String job,
+            @RequestParam(name = "from", required = false) Long from,
+            @RequestParam(name = "to", required = false) Long to) {
+        List<String> mergedServers = mergeFilters(servers, varServers);
+        List<PostgresQueryMetrics> rows = postgresDbChecksMetricsService.fetchQueryMetrics(mergedServers, job, from, to);
+        String html = postgresDbChecksHtmlService.generatePage(rows, mergedServers, job, from, to);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+        return new ResponseEntity<>(html, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Те же параметры, что {@code /dbChecks}, ответ — JSON.
+     */
+    @GetMapping(value = "/dbChecksJson", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<PostgresQueryMetrics>> dbChecksJson(
+            @RequestParam(name = "servers", required = false) List<String> servers,
+            @RequestParam(name = "var-server", required = false) List<String> varServers,
+            @RequestParam(name = "job", required = false) String job,
+            @RequestParam(name = "from", required = false) Long from,
+            @RequestParam(name = "to", required = false) Long to) {
+        List<String> mergedServers = mergeFilters(servers, varServers);
+        List<PostgresQueryMetrics> rows = postgresDbChecksMetricsService.fetchQueryMetrics(mergedServers, job, from, to);
+        return ResponseEntity.ok(rows);
     }
 
     /**
