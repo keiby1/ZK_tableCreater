@@ -171,17 +171,20 @@ public class MainController {
 
     /**
      * Таблица в браузере: средняя и максимальная утилизация CPU и RAM по Linux-хостам (метрики node_exporter в VictoriaMetrics).
-     * @param instances фильтр по лейблу {@code instance} (hostname:port и т.д.): повторяющийся параметр или список через запятую;
-     *                  пусто — все хосты с метриками
+     * @param instances    устаревший параметр фильтра по лейблу {@code instance}; оставлен для обратной совместимости
+     * @param varInstances параметр Grafana-переменной: {@code var-instance}. Может приходить без порта (например {@code host}),
+     *                     порт будет подставлен на стороне сервиса.
      * @param from      начало интервала (UTC, мс), вместе с {@code to} задаёт окно агрегации
      * @param to        конец интервала (UTC, мс)
      */
     @GetMapping("/servers")
     public ResponseEntity<String> servers(
             @RequestParam(name = "instances", required = false) List<String> instances,
+            @RequestParam(name = "var-instance", required = false) List<String> varInstances,
             @RequestParam(name = "from", required = false) Long from,
             @RequestParam(name = "to", required = false) Long to) {
-        List<LinuxServerMetrics> rows = nodeExporterMetricsService.fetchLinuxServerMetrics(instances, from, to);
+        List<String> merged = mergeFilters(instances, varInstances);
+        List<LinuxServerMetrics> rows = nodeExporterMetricsService.fetchLinuxServerMetrics(merged, from, to);
         String html = linuxServersHtmlService.generatePage(rows, from, to);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
@@ -194,10 +197,26 @@ public class MainController {
     @GetMapping(value = "/serversJson", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<LinuxServerMetrics>> serversJson(
             @RequestParam(name = "instances", required = false) List<String> instances,
+            @RequestParam(name = "var-instance", required = false) List<String> varInstances,
             @RequestParam(name = "from", required = false) Long from,
             @RequestParam(name = "to", required = false) Long to) {
-        List<LinuxServerMetrics> rows = nodeExporterMetricsService.fetchLinuxServerMetrics(instances, from, to);
+        List<String> merged = mergeFilters(instances, varInstances);
+        List<LinuxServerMetrics> rows = nodeExporterMetricsService.fetchLinuxServerMetrics(merged, from, to);
         return ResponseEntity.ok(rows);
+    }
+
+    private static List<String> mergeFilters(List<String> a, List<String> b) {
+        if ((a == null || a.isEmpty()) && (b == null || b.isEmpty())) {
+            return List.of();
+        }
+        List<String> out = new LinkedList<>();
+        if (a != null && !a.isEmpty()) {
+            out.addAll(a);
+        }
+        if (b != null && !b.isEmpty()) {
+            out.addAll(b);
+        }
+        return out;
     }
 
     /**

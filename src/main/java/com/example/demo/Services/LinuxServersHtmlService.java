@@ -44,8 +44,8 @@ public class LinuxServersHtmlService {
         html.append(appLayoutService.buildAppHeader());
         html.append("    <h1 style=\"font-size:1.2em;color:#333;\">Утилизация CPU и RAM (node_exporter)</h1>\n");
         html.append("    <div class=\"interval-info\">Интервал выгрузки: ").append(formatInterval(from, to)).append("</div>\n");
-        html.append("    <div class=\"hint\">Фильтр по серверам: параметр <code>instances</code> — список значений лейбла <code>instance</code> ");
-        html.append("(несколько раз <code>?instances=host:9100&amp;instances=...</code> или через запятую <code>?instances=a,b,c</code>). ");
+        html.append("    <div class=\"hint\">Фильтр по серверам: параметр <code>var-instance</code> (из Grafana) или <code>instances</code> ");
+        html.append("— список значений лейбла <code>instance</code> (в этой VictoriaMetrics он без порта, например <code>host1</code>). ");
         html.append("Пустой список — все хосты с метриками в VictoriaMetrics.</div>\n");
         html.append("    <table>\n");
         html.append("        <thead><tr>\n");

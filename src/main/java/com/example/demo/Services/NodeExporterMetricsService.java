@@ -98,14 +98,63 @@ public class NodeExporterMetricsService {
                 for (String part : s.split(",")) {
                     String t = part.trim();
                     if (!t.isEmpty()) {
-                        out.add(t);
+                        String normalized = normalizeInstanceToken(t);
+                        if (normalized != null) {
+                            out.add(normalized);
+                        }
                     }
                 }
             } else {
-                out.add(s.trim());
+                String normalized = normalizeInstanceToken(s.trim());
+                if (normalized != null) {
+                    out.add(normalized);
+                }
             }
         }
         return out;
+    }
+
+    /**
+     * Нормализация значения фильтра по лейблу {@code instance}.
+     * <p>
+     * В этом проекте на стороне экспортеров настроено переопределение instance перед отправкой в VictoriaMetrics,
+     * поэтому в метриках {@code instance} хранится без порта (например {@code host1}).
+     * </p>
+     */
+    private static String normalizeInstanceToken(String token) {
+        if (token == null) {
+            return null;
+        }
+        String t = token.trim();
+        if (t.isEmpty()) {
+            return null;
+        }
+        // На всякий случай поддержим "http(s)://host:port/..." из копипаста.
+        if (t.startsWith("http://")) {
+            t = t.substring("http://".length());
+        } else if (t.startsWith("https://")) {
+            t = t.substring("https://".length());
+        }
+        int slash = t.indexOf('/');
+        if (slash >= 0) {
+            t = t.substring(0, slash);
+        }
+        t = t.trim();
+        if (t.isEmpty()) {
+            return null;
+        }
+        // Если прилетело host:port, а в VM instance хранится без порта — отрежем порт.
+        // Ограничение: IPv6-адреса с ':' тут не нормализуем (оставляем как есть).
+        int firstColon = t.indexOf(':');
+        int lastColon = t.lastIndexOf(':');
+        if (firstColon >= 0 && firstColon == lastColon && lastColon < t.length() - 1) {
+            String host = t.substring(0, lastColon).trim();
+            String maybePort = t.substring(lastColon + 1).trim();
+            if (!host.isEmpty() && maybePort.matches("\\d+")) {
+                t = host;
+            }
+        }
+        return t;
     }
 
     private static String cpuIdleSelector(List<String> instances) {
