@@ -21,6 +21,11 @@ public class LinuxServerMetrics {
     private Long memTotalBytes;
     /** Релиз ядра Linux (лейбл {@code release} метрики {@code node_uname_info}), например {@code 4.18.0-553.111.1.el9.x86_64}. */
     private String linuxRelease;
+    /**
+     * Число TCP-сокетов в состоянии TIME_WAIT ({@code node_tcp_connection_states{state="time_wait"}}),
+     * на момент instant-запроса (конец интервала); при нескольких рядах на хост — сумма. Null если метрики нет.
+     */
+    private Long tcpTimeWaitCount;
     /** Средняя утилизация CPU, % (0–100). */
     private int cpuAvgPercent;
     /** Максимальная утилизация CPU за интервал, % (0–100). */

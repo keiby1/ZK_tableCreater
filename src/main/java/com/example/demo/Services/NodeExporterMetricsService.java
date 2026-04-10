@@ -75,6 +75,10 @@ public class NodeExporterMetricsService {
         String qUname = unameSelector(filter);
         fillReleaseByInstance(byInstance, qUname, evaluationTimeSec);
 
+        String qTcpTimeWait = tcpTimeWaitQuery(filter);
+        fillNumericByInstance(byInstance, qTcpTimeWait, evaluationTimeSec,
+                (row, v) -> row.setTcpTimeWaitCount(Math.round(v)));
+
         List<LinuxServerMetrics> rows = new ArrayList<>(byInstance.values());
         rows.sort(Comparator.comparing(LinuxServerMetrics::getInstance, Comparator.nullsLast(String::compareTo)));
         return rows;
@@ -134,6 +138,18 @@ public class NodeExporterMetricsService {
             return "node_uname_info";
         }
         return "node_uname_info{" + LABEL_INSTANCE + "=~\"" + instanceRegexOr(instances) + "\"}";
+    }
+
+    /**
+     * Количество сокетов в TIME_WAIT; {@code sum by (instance)} на случай нескольких рядов (например разные наборы лейблов).
+     */
+    private static String tcpTimeWaitQuery(List<String> instances) {
+        StringBuilder inner = new StringBuilder("node_tcp_connection_states{state=\"time_wait\"");
+        if (!instances.isEmpty()) {
+            inner.append(",").append(LABEL_INSTANCE).append("=~\"").append(instanceRegexOr(instances)).append("\"");
+        }
+        inner.append("}");
+        return "sum by (" + LABEL_INSTANCE + ") (" + inner + ")";
     }
 
     private static String instanceRegexOr(List<String> instances) {

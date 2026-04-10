@@ -53,6 +53,7 @@ public class LinuxServersHtmlService {
         html.append("            <th>CPU cores</th>\n");
         html.append("            <th>RAM total</th>\n");
         html.append("            <th>Linux release</th>\n");
+        html.append("            <th>TCP TIME_WAIT</th>\n");
         html.append("            <th>CpuAvgUse %</th>\n");
         html.append("            <th>CpuMaxUse %</th>\n");
         html.append("            <th>MemAvgUse %</th>\n");
@@ -66,6 +67,7 @@ public class LinuxServersHtmlService {
             html.append("                <td style=\"text-align:left\">").append(escapeHtml(formatMemTotal(r.getMemTotalBytes()))).append("</td>\n");
             html.append("                <td style=\"text-align:left;font-size:0.92em\">")
                     .append(escapeHtml(r.getLinuxRelease() != null ? r.getLinuxRelease() : "—")).append("</td>\n");
+            html.append("                <td>").append(formatNullableLong(r.getTcpTimeWaitCount())).append("</td>\n");
             html.append("                <td>").append(r.getCpuAvgPercent()).append("</td>\n");
             html.append("                <td>").append(r.getCpuMaxPercent()).append("</td>\n");
             html.append("                <td>").append(r.getMemAvgPercent()).append("</td>\n");
@@ -73,7 +75,7 @@ public class LinuxServersHtmlService {
             html.append("            </tr>\n");
         }
         if (rows.isEmpty()) {
-            html.append("            <tr><td colspan=\"8\" style=\"padding:24px;color:#666;\">Нет данных по запросу ");
+            html.append("            <tr><td colspan=\"9\" style=\"padding:24px;color:#666;\">Нет данных по запросу ");
             html.append("(проверьте интервал, фильтр <code>instances</code> и наличие метрик node_exporter).</td></tr>\n");
         }
         html.append("        </tbody>\n");
@@ -100,6 +102,10 @@ public class LinuxServersHtmlService {
     }
 
     private static String formatNullableInt(Integer n) {
+        return n == null ? "—" : String.valueOf(n);
+    }
+
+    private static String formatNullableLong(Long n) {
         return n == null ? "—" : String.valueOf(n);
     }
 
