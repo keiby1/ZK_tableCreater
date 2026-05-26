@@ -21,6 +21,7 @@ public class AppLayoutService {
                 + "        <a id=\"app-nav-excel\" href=\"/getExcel\" class=\"app-nav-link\">Сохранить Excel</a>\n"
                 + "        <a href=\"/servers\" class=\"app-nav-link\">Linux-серверы</a>\n"
                 + "        <a href=\"/compare\" class=\"app-nav-link\">Сравнить</a>\n"
+                + "        <a href=\"/compareDa\" class=\"app-nav-link\">Сравнить DA</a>\n"
                 + "      </nav>\n"
                 + "      <div class=\"app-legend\">\n"
                 + "        <details>\n"

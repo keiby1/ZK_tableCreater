@@ -4,7 +4,10 @@ import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
 import com.example.demo.DTO.LinuxServerMetrics;
 import com.example.demo.DTO.PostgresQueryMetrics;
+import com.example.demo.DTO.DaCsvDocument;
+import com.example.demo.DTO.DaCsvParseException;
 import com.example.demo.Services.AppLayoutService;
+import com.example.demo.Services.DaCsvReaderService;
 import com.example.demo.Services.ExcelTableService;
 import com.example.demo.Services.HtmlComparisonService;
 import com.example.demo.Services.HtmlParserService;
@@ -63,6 +66,9 @@ public class MainController {
 
     @Autowired
     private PostgresDbChecksHtmlService postgresDbChecksHtmlService;
+
+    @Autowired
+    private DaCsvReaderService daCsvReaderService;
     
     @RequestMapping("/ping")
     public String test(){
@@ -276,6 +282,86 @@ public class MainController {
     }
 
     /**
+     * GET /compareDa — страница выбора двух CSV-файлов для сверки (логика сравнения — позже).
+     */
+    @GetMapping("/compareDa")
+    public ResponseEntity<String> compareDaPage() {
+        String html = buildCompareDaUploadPage();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+        return new ResponseEntity<>(html, headers, HttpStatus.OK);
+    }
+
+    /**
+     * POST /compareDa — заглушка до реализации сравнения CSV.
+     */
+    @PostMapping(value = "/compareDa", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> compareDaSubmit(
+            @RequestParam("file1") MultipartFile file1,
+            @RequestParam("file2") MultipartFile file2) {
+        String file1Name = file1.getOriginalFilename() != null ? file1.getOriginalFilename() : "Файл 1";
+        String file2Name = file2.getOriginalFilename() != null ? file2.getOriginalFilename() : "Файл 2";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+        try {
+            DaCsvDocument doc1 = daCsvReaderService.read(file1);
+            DaCsvDocument doc2 = daCsvReaderService.read(file2);
+            String body = "<!DOCTYPE html>\n"
+                    + "<html lang=\"ru\">\n"
+                    + "<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                    + "<title>Сравнение CSV (DA)</title></head>\n"
+                    + "<body style=\"font-family: Arial, sans-serif; margin: 24px; background: #f5f5f5;\">\n"
+                    + appLayoutService.buildAppHeader()
+                    + "  <div style=\"max-width: 680px; padding: 16px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px;\">\n"
+                    + "    <p style=\"margin: 0 0 8px 0;\">Файлы успешно прочитаны. Табличное сравнение будет добавлено позже.</p>\n"
+                    + "    <p style=\"margin: 0; font-size: 0.95em; color: #424242;\"><strong>"
+                    + escapeHtml(file1Name) + "</strong> — строк данных: " + doc1.getRows().size()
+                    + "; <strong>" + escapeHtml(file2Name) + "</strong> — строк данных: " + doc2.getRows().size()
+                    + ".</p>\n"
+                    + "  </div>\n"
+                    + "  <p style=\"margin-top: 16px;\"><a href=\"/compareDa\">← Вернуться к выбору файлов</a></p>\n"
+                    + "</body></html>";
+            return new ResponseEntity<>(body, headers, HttpStatus.OK);
+        } catch (DaCsvParseException e) {
+            String body = "<!DOCTYPE html>\n"
+                    + "<html lang=\"ru\">\n"
+                    + "<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                    + "<title>Ошибка CSV (DA)</title></head>\n"
+                    + "<body style=\"font-family: Arial, sans-serif; margin: 24px; background: #f5f5f5;\">\n"
+                    + appLayoutService.buildAppHeader()
+                    + "  <div style=\"max-width: 680px; padding: 16px; background: #ffebee; border: 1px solid #ef9a9a; border-radius: 6px;\">\n"
+                    + "    <p style=\"margin: 0;\">" + escapeHtml(e.getMessage()) + "</p>\n"
+                    + "  </div>\n"
+                    + "  <p style=\"margin-top: 16px;\"><a href=\"/compareDa\">← Вернуться к выбору файлов</a></p>\n"
+                    + "</body></html>";
+            return new ResponseEntity<>(body, headers, HttpStatus.OK);
+        } catch (IOException e) {
+            String body = "<!DOCTYPE html>\n"
+                    + "<html lang=\"ru\">\n"
+                    + "<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                    + "<title>Ошибка чтения CSV (DA)</title></head>\n"
+                    + "<body style=\"font-family: Arial, sans-serif; margin: 24px; background: #f5f5f5;\">\n"
+                    + appLayoutService.buildAppHeader()
+                    + "  <div style=\"max-width: 680px; padding: 16px; background: #ffebee; border: 1px solid #ef9a9a; border-radius: 6px;\">\n"
+                    + "    <p style=\"margin: 0;\">Ошибка чтения файла: " + escapeHtml(e.getMessage()) + "</p>\n"
+                    + "  </div>\n"
+                    + "  <p style=\"margin-top: 16px;\"><a href=\"/compareDa\">← Вернуться к выбору файлов</a></p>\n"
+                    + "</body></html>";
+            return new ResponseEntity<>(body, headers, HttpStatus.OK);
+        }
+    }
+
+    private static String escapeHtml(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
+    /**
      * POST /compare — приём двух HTML-файлов таблиц, парсинг и возврат страницы с результатом сравнения.
      */
     @PostMapping(value = "/compare", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -306,12 +392,38 @@ public class MainController {
     }
 
     private String buildCompareUploadPage() {
+        return buildTwoFileUploadComparePage(
+                "/compare",
+                "Сравнение таблиц",
+                "Сравнение двух таблиц выгрузки",
+                "Выберите два HTML-файла таблиц (скачанных через /get или /getHtml). Перетащите файлы в зоны или нажмите для выбора.",
+                ".html,.htm",
+                "Сравнить таблицы");
+    }
+
+    private String buildCompareDaUploadPage() {
+        return buildTwoFileUploadComparePage(
+                "/compareDa",
+                "Сравнение CSV (DA)",
+                "Сверка двух CSV-файлов (ДА)",
+                "Выберите два CSV-файла для сравнения. Перетащите файлы в зоны или нажмите для выбора.",
+                ".csv,text/csv",
+                "Сравнить DA");
+    }
+
+    private String buildTwoFileUploadComparePage(
+            String formAction,
+            String documentTitle,
+            String heading,
+            String hint,
+            String accept,
+            String submitLabel) {
         return "<!DOCTYPE html>\n"
                 + "<html lang=\"ru\">\n"
                 + "<head>\n"
                 + "  <meta charset=\"UTF-8\">\n"
                 + "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-                + "  <title>Сравнение таблиц</title>\n"
+                + "  <title>" + escapeHtml(documentTitle) + "</title>\n"
                 + "  <style>\n"
                 + "    body { font-family: Arial, sans-serif; margin: 24px; background: #f5f5f5; }\n"
                 + "    h1 { color: #2e7d32; margin-bottom: 8px; }\n"
@@ -329,24 +441,24 @@ public class MainController {
                 + "</head>\n"
                 + "<body>\n"
                 + appLayoutService.buildAppHeader()
-                + "  <h1>Сравнение двух таблиц выгрузки</h1>\n"
-                + "  <p class=\"hint\">Выберите два HTML-файла таблиц (скачанных через /get или /getHtml). Перетащите файлы в зоны или нажмите для выбора.</p>\n"
-                + "  <form id=\"compareForm\" action=\"/compare\" method=\"post\" enctype=\"multipart/form-data\">\n"
+                + "  <h1>" + escapeHtml(heading) + "</h1>\n"
+                + "  <p class=\"hint\">" + escapeHtml(hint) + "</p>\n"
+                + "  <form id=\"compareForm\" action=\"" + escapeHtml(formAction) + "\" method=\"post\" enctype=\"multipart/form-data\">\n"
                 + "    <div>\n"
                 + "      <label>Первый файл</label>\n"
                 + "      <div class=\"upload-zone\" id=\"zone1\" data-input=\"input1\">\n"
                 + "        <span class=\"label\" id=\"label1\">Перетащите файл сюда или нажмите для выбора</span>\n"
-                + "        <input type=\"file\" name=\"file1\" id=\"input1\" accept=\".html,.htm\">\n"
+                + "        <input type=\"file\" name=\"file1\" id=\"input1\" accept=\"" + escapeHtml(accept) + "\">\n"
                 + "      </div>\n"
                 + "    </div>\n"
                 + "    <div>\n"
                 + "      <label>Второй файл</label>\n"
                 + "      <div class=\"upload-zone\" id=\"zone2\" data-input=\"input2\">\n"
                 + "        <span class=\"label\" id=\"label2\">Перетащите файл сюда или нажмите для выбора</span>\n"
-                + "        <input type=\"file\" name=\"file2\" id=\"input2\" accept=\".html,.htm\">\n"
+                + "        <input type=\"file\" name=\"file2\" id=\"input2\" accept=\"" + escapeHtml(accept) + "\">\n"
                 + "      </div>\n"
                 + "    </div>\n"
-                + "    <button type=\"submit\" class=\"btn\" id=\"submitBtn\" disabled>Сравнить таблицы</button>\n"
+                + "    <button type=\"submit\" class=\"btn\" id=\"submitBtn\" disabled>" + escapeHtml(submitLabel) + "</button>\n"
                 + "  </form>\n"
                 + "  <script>\n"
                 + "    function setupZone(zoneId, inputId, labelId) {\n"
