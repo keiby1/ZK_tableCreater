@@ -65,6 +65,19 @@ public class DaCsvComparisonHtmlService {
         html.append("    tr:hover td.cmp-below-20 { background: #ffcc80; }\n");
         html.append("    tr:hover td.cmp-above-20 { background: #e57373; }\n");
         html.append("    tr:hover td.cmp-missing { background: #b0bec5; }\n");
+        html.append("    .filters { margin-bottom: 16px; padding: 12px 16px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }\n");
+        html.append("    .filters h3 { margin: 0 0 10px 0; font-size: 0.95em; color: #2e7d32; }\n");
+        html.append("    .filters-row { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }\n");
+        html.append("    .filter-field { display: flex; flex-direction: column; gap: 4px; min-width: 180px; flex: 1; }\n");
+        html.append("    .filter-field label { font-size: 0.85em; color: #616161; font-weight: bold; }\n");
+        html.append("    .filter-field input { padding: 8px 10px; border: 1px solid #bdbdbd; border-radius: 6px; font-size: 0.92em; }\n");
+        html.append("    .filter-field input:focus { outline: none; border-color: #4CAF50; box-shadow: 0 0 0 2px rgba(76,175,80,0.2); }\n");
+        html.append("    .filter-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }\n");
+        html.append("    .filter-btn { padding: 8px 16px; background: #4CAF50; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; }\n");
+        html.append("    .filter-btn:hover { background: #43A047; }\n");
+        html.append("    .filter-btn-secondary { background: #fff; color: #4CAF50; border: 1px solid #4CAF50; }\n");
+        html.append("    .filter-btn-secondary:hover { background: #e8f5e9; }\n");
+        html.append("    .filter-count { font-size: 0.9em; color: #616161; }\n");
         html.append("    .back-link { margin-top: 16px; }\n");
         html.append("  </style>\n");
         html.append("</head>\n");
@@ -88,8 +101,29 @@ public class DaCsvComparisonHtmlService {
         html.append("      </ul>\n");
         html.append("    </details>\n");
         html.append("  </div>\n");
+        html.append("  <div class=\"filters\">\n");
+        html.append("    <h3>Фильтр по ключевым полям</h3>\n");
+        html.append("    <div class=\"filters-row\">\n");
+        html.append("      <div class=\"filter-field\">\n");
+        html.append("        <label for=\"filter-namespace\">Namespace</label>\n");
+        html.append("        <input type=\"text\" id=\"filter-namespace\" placeholder=\"Часть имени…\" autocomplete=\"off\">\n");
+        html.append("      </div>\n");
+        html.append("      <div class=\"filter-field\">\n");
+        html.append("        <label for=\"filter-deployment\">Deployment</label>\n");
+        html.append("        <input type=\"text\" id=\"filter-deployment\" placeholder=\"Часть имени…\" autocomplete=\"off\">\n");
+        html.append("      </div>\n");
+        html.append("      <div class=\"filter-field\">\n");
+        html.append("        <label for=\"filter-container\">Container</label>\n");
+        html.append("        <input type=\"text\" id=\"filter-container\" placeholder=\"Часть имени…\" autocomplete=\"off\">\n");
+        html.append("      </div>\n");
+        html.append("      <div class=\"filter-actions\">\n");
+        html.append("        <button type=\"button\" class=\"filter-btn filter-btn-secondary\" id=\"filter-clear\">Сбросить</button>\n");
+        html.append("        <span class=\"filter-count\" id=\"filter-count\"></span>\n");
+        html.append("      </div>\n");
+        html.append("    </div>\n");
+        html.append("  </div>\n");
         html.append("  <div class=\"table-wrap\">\n");
-        html.append("    <table>\n");
+        html.append("    <table id=\"da-compare-table\">\n");
         html.append("      <thead>\n");
         html.append("        <tr>\n");
         html.append("          <th colspan=\"3\" class=\"key-col\">Ключ</th>\n");
@@ -114,12 +148,15 @@ public class DaCsvComparisonHtmlService {
         html.append("          <th class=\"group-right\">RAM Used</th>\n");
         html.append("        </tr>\n");
         html.append("      </thead>\n");
-        html.append("      <tbody>\n");
+        html.append("      <tbody id=\"da-compare-tbody\">\n");
 
         for (DaCompareRow row : rows) {
             DaResourceRow left = row.getLeft();
             DaResourceRow right = row.getRight();
-            html.append("        <tr>\n");
+            html.append("        <tr class=\"data-row\" data-namespace=\"")
+                    .append(escapeHtmlAttr(row.getNamespace())).append("\" data-deployment=\"")
+                    .append(escapeHtmlAttr(row.getDeployment())).append("\" data-container=\"")
+                    .append(escapeHtmlAttr(row.getContainerName())).append("\">\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getNamespace())).append("</td>\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getDeployment())).append("</td>\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getContainerName())).append("</td>\n");
@@ -131,6 +168,47 @@ public class DaCsvComparisonHtmlService {
         html.append("    </table>\n");
         html.append("  </div>\n");
         html.append("  <p class=\"back-link\"><a href=\"/compareDa\">← Вернуться к выбору файлов</a></p>\n");
+        html.append("  <script>\n");
+        html.append("    (function() {\n");
+        html.append("      var nsInput = document.getElementById('filter-namespace');\n");
+        html.append("      var depInput = document.getElementById('filter-deployment');\n");
+        html.append("      var contInput = document.getElementById('filter-container');\n");
+        html.append("      var countEl = document.getElementById('filter-count');\n");
+        html.append("      var clearBtn = document.getElementById('filter-clear');\n");
+        html.append("      function rowMatches(tr, nsQ, depQ, contQ) {\n");
+        html.append("        var ns = (tr.getAttribute('data-namespace') || '').toLowerCase();\n");
+        html.append("        var dep = (tr.getAttribute('data-deployment') || '').toLowerCase();\n");
+        html.append("        var cont = (tr.getAttribute('data-container') || '').toLowerCase();\n");
+        html.append("        if (nsQ && ns.indexOf(nsQ) < 0) return false;\n");
+        html.append("        if (depQ && dep.indexOf(depQ) < 0) return false;\n");
+        html.append("        if (contQ && cont.indexOf(contQ) < 0) return false;\n");
+        html.append("        return true;\n");
+        html.append("      }\n");
+        html.append("      function applyFilter() {\n");
+        html.append("        var nsQ = nsInput.value.trim().toLowerCase();\n");
+        html.append("        var depQ = depInput.value.trim().toLowerCase();\n");
+        html.append("        var contQ = contInput.value.trim().toLowerCase();\n");
+        html.append("        var rows = document.querySelectorAll('#da-compare-tbody tr.data-row');\n");
+        html.append("        var visible = 0;\n");
+        html.append("        rows.forEach(function(tr) {\n");
+        html.append("          var show = rowMatches(tr, nsQ, depQ, contQ);\n");
+        html.append("          tr.style.display = show ? '' : 'none';\n");
+        html.append("          if (show) visible++;\n");
+        html.append("        });\n");
+        html.append("        countEl.textContent = 'Показано: ' + visible + ' из ' + rows.length;\n");
+        html.append("      }\n");
+        html.append("      [nsInput, depInput, contInput].forEach(function(el) {\n");
+        html.append("        el.addEventListener('input', applyFilter);\n");
+        html.append("      });\n");
+        html.append("      clearBtn.addEventListener('click', function() {\n");
+        html.append("        nsInput.value = '';\n");
+        html.append("        depInput.value = '';\n");
+        html.append("        contInput.value = '';\n");
+        html.append("        applyFilter();\n");
+        html.append("      });\n");
+        html.append("      applyFilter();\n");
+        html.append("    })();\n");
+        html.append("  </script>\n");
         html.append("</body>\n");
         html.append("</html>");
         return html.toString();
@@ -238,5 +316,9 @@ public class DaCsvComparisonHtmlService {
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;");
+    }
+
+    private static String escapeHtmlAttr(String s) {
+        return escapeHtml(s);
     }
 }
