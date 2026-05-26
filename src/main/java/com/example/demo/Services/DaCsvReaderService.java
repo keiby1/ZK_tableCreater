@@ -104,26 +104,46 @@ public class DaCsvReaderService {
         String ns = requireText(getCol(cols, colIdx, 0), sourceName, lineNum, "Namespace");
         String pod = requireText(getCol(cols, colIdx, 1), sourceName, lineNum, "Pod");
         String container = requireText(getCol(cols, colIdx, 2), sourceName, lineNum, "Container");
+        String deployment = DaPodNameParser.extractDeployment(pod);
 
-        BigDecimal cpuRq = parseCpuCores(getCol(cols, colIdx, 3), sourceName, lineNum, "CPU Requests");
-        BigDecimal cpuLim = parseCpuCores(getCol(cols, colIdx, 4), sourceName, lineNum, "CPU Limits");
-        BigDecimal cpuUsed = parseCpuCores(getCol(cols, colIdx, 5), sourceName, lineNum, "CPU Used");
+        String cpuRqRaw = getCol(cols, colIdx, 3);
+        String cpuLimRaw = getCol(cols, colIdx, 4);
+        String cpuUsedRaw = getCol(cols, colIdx, 5);
+        String ramRqRaw = getCol(cols, colIdx, 6);
+        String ramLimRaw = getCol(cols, colIdx, 7);
+        String ramUsedRaw = getCol(cols, colIdx, 8);
 
-        long ramRq = parseMemory(getCol(cols, colIdx, 6), sourceName, lineNum, "RAM Requests");
-        long ramLim = parseMemory(getCol(cols, colIdx, 7), sourceName, lineNum, "RAM Limits");
-        long ramUsed = parseMemory(getCol(cols, colIdx, 8), sourceName, lineNum, "RAM Used");
+        DaResourceRow row = new DaResourceRow();
+        row.setNamespace(ns);
+        row.setPod(pod);
+        row.setDeployment(deployment);
+        row.setContainerName(container);
+        row.setSourceLineNumber(lineNum);
+        row.setCpuRequestDisplay(displayOrEmpty(cpuRqRaw));
+        row.setCpuLimitDisplay(displayOrEmpty(cpuLimRaw));
+        row.setCpuUsedDisplay(displayOrEmpty(cpuUsedRaw));
+        row.setRamRequestDisplay(displayOrEmpty(ramRqRaw));
+        row.setRamLimitDisplay(displayOrEmpty(ramLimRaw));
+        row.setRamUsedDisplay(displayOrEmpty(ramUsedRaw));
+        row.setCpuRequestCores(parseCpuCoresOptional(cpuRqRaw, sourceName, lineNum, "CPU Requests"));
+        row.setCpuLimitCores(parseCpuCoresOptional(cpuLimRaw, sourceName, lineNum, "CPU Limits"));
+        row.setCpuUsedCores(parseCpuCoresOptional(cpuUsedRaw, sourceName, lineNum, "CPU Used"));
+        row.setRamRequestBytes(parseMemoryOptional(ramRqRaw, sourceName, lineNum, "RAM Requests"));
+        row.setRamLimitBytes(parseMemoryOptional(ramLimRaw, sourceName, lineNum, "RAM Limits"));
+        row.setRamUsedBytes(parseMemoryOptional(ramUsedRaw, sourceName, lineNum, "RAM Used"));
+        return row;
+    }
 
-        return new DaResourceRow(
-                ns,
-                pod,
-                container,
-                cpuRq,
-                cpuLim,
-                cpuUsed,
-                ramRq,
-                ramLim,
-                ramUsed,
-                lineNum);
+    private static String displayOrEmpty(String raw) {
+        if (raw == null || raw.isBlank() || isMissingToken(raw)) {
+            return "";
+        }
+        return raw.trim();
+    }
+
+    private static boolean isMissingToken(String raw) {
+        String s = raw.trim();
+        return s.isEmpty() || "-".equals(s);
     }
 
     private static String getCol(List<String> cols, Map<Integer, Integer> colIdx, int logicalIndex) {
@@ -138,23 +158,22 @@ public class DaCsvReaderService {
         return value.trim();
     }
 
-    private static BigDecimal parseCpuCores(String raw, String sourceName, int lineNum, String field) {
-        if (raw == null || raw.isBlank()) {
-            throw new DaCsvParseException(sourceName, lineNum, "Пустое значение поля \"" + field + "\"");
+    private static BigDecimal parseCpuCoresOptional(String raw, String sourceName, int lineNum, String field) {
+        if (raw == null || raw.isBlank() || isMissingToken(raw)) {
+            return null;
         }
         String s = raw.trim().replace(',', '.');
         try {
-            BigDecimal bd = new BigDecimal(s);
-            return bd.stripTrailingZeros();
+            return new BigDecimal(s).stripTrailingZeros();
         } catch (NumberFormatException e) {
             throw new DaCsvParseException(sourceName, lineNum,
                     "Поле \"" + field + "\": не удалось распознать число \"" + raw + "\"", e);
         }
     }
 
-    private static long parseMemory(String raw, String sourceName, int lineNum, String field) {
-        if (raw == null || raw.isBlank()) {
-            throw new DaCsvParseException(sourceName, lineNum, "Пустое значение поля \"" + field + "\"");
+    private static Long parseMemoryOptional(String raw, String sourceName, int lineNum, String field) {
+        if (raw == null || raw.isBlank() || isMissingToken(raw)) {
+            return null;
         }
         Matcher m = MEMORY_PATTERN.matcher(raw.trim());
         if (!m.matches()) {

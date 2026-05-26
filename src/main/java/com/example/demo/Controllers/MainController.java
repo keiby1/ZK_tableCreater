@@ -4,9 +4,12 @@ import com.example.demo.DTO.Container;
 import com.example.demo.DTO.Deployment;
 import com.example.demo.DTO.LinuxServerMetrics;
 import com.example.demo.DTO.PostgresQueryMetrics;
+import com.example.demo.DTO.DaCompareRow;
 import com.example.demo.DTO.DaCsvDocument;
 import com.example.demo.DTO.DaCsvParseException;
 import com.example.demo.Services.AppLayoutService;
+import com.example.demo.Services.DaCsvComparisonHtmlService;
+import com.example.demo.Services.DaCsvComparisonService;
 import com.example.demo.Services.DaCsvReaderService;
 import com.example.demo.Services.ExcelTableService;
 import com.example.demo.Services.HtmlComparisonService;
@@ -69,6 +72,12 @@ public class MainController {
 
     @Autowired
     private DaCsvReaderService daCsvReaderService;
+
+    @Autowired
+    private DaCsvComparisonService daCsvComparisonService;
+
+    @Autowired
+    private DaCsvComparisonHtmlService daCsvComparisonHtmlService;
     
     @RequestMapping("/ping")
     public String test(){
@@ -293,7 +302,7 @@ public class MainController {
     }
 
     /**
-     * POST /compareDa — заглушка до реализации сравнения CSV.
+     * POST /compareDa — чтение двух CSV, left join и таблица сравнения.
      */
     @PostMapping(value = "/compareDa", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> compareDaSubmit(
@@ -306,22 +315,9 @@ public class MainController {
         try {
             DaCsvDocument doc1 = daCsvReaderService.read(file1);
             DaCsvDocument doc2 = daCsvReaderService.read(file2);
-            String body = "<!DOCTYPE html>\n"
-                    + "<html lang=\"ru\">\n"
-                    + "<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-                    + "<title>Сравнение CSV (DA)</title></head>\n"
-                    + "<body style=\"font-family: Arial, sans-serif; margin: 24px; background: #f5f5f5;\">\n"
-                    + appLayoutService.buildAppHeader()
-                    + "  <div style=\"max-width: 680px; padding: 16px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px;\">\n"
-                    + "    <p style=\"margin: 0 0 8px 0;\">Файлы успешно прочитаны. Табличное сравнение будет добавлено позже.</p>\n"
-                    + "    <p style=\"margin: 0; font-size: 0.95em; color: #424242;\"><strong>"
-                    + escapeHtml(file1Name) + "</strong> — строк данных: " + doc1.getRows().size()
-                    + "; <strong>" + escapeHtml(file2Name) + "</strong> — строк данных: " + doc2.getRows().size()
-                    + ".</p>\n"
-                    + "  </div>\n"
-                    + "  <p style=\"margin-top: 16px;\"><a href=\"/compareDa\">← Вернуться к выбору файлов</a></p>\n"
-                    + "</body></html>";
-            return new ResponseEntity<>(body, headers, HttpStatus.OK);
+            List<DaCompareRow> compareRows = daCsvComparisonService.compare(doc1, doc2);
+            String html = daCsvComparisonHtmlService.generateComparisonPage(compareRows, file1Name, file2Name);
+            return new ResponseEntity<>(html, headers, HttpStatus.OK);
         } catch (DaCsvParseException e) {
             String body = "<!DOCTYPE html>\n"
                     + "<html lang=\"ru\">\n"

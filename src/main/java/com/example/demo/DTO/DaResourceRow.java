@@ -4,49 +4,34 @@ import java.math.BigDecimal;
 
 /**
  * Одна строка выгрузки ДА из CSV: контейнер в поде namespace с заявками/лимитами и использованием CPU и RAM.
- * <ul>
- *   <li>CPU — значения из файла в <strong>ядрах</strong> (cores).</li>
- *   <li>RAM — байты после разбора строк вида {@code 1.11 GiB}, {@code 432.123 MiB} (×1024, KiB/MiB/GiB/TiB).</li>
- * </ul>
  */
 public class DaResourceRow {
 
     private String namespace;
+    /** Полное имя пода из CSV */
     private String pod;
+    /** Имя deployment, извлечённое из {@link #pod} */
+    private String deployment;
     private String containerName;
+
     private BigDecimal cpuRequestCores;
     private BigDecimal cpuLimitCores;
     private BigDecimal cpuUsedCores;
-    private long ramRequestBytes;
-    private long ramLimitBytes;
-    private long ramUsedBytes;
-    /** Номер строки в CSV (первая строка файла — заголовок имеет номер 1). */
+    private Long ramRequestBytes;
+    private Long ramLimitBytes;
+    private Long ramUsedBytes;
+
+    /** Исходные значения ячеек для отображения в таблице сравнения */
+    private String cpuRequestDisplay;
+    private String cpuLimitDisplay;
+    private String cpuUsedDisplay;
+    private String ramRequestDisplay;
+    private String ramLimitDisplay;
+    private String ramUsedDisplay;
+
     private int sourceLineNumber;
 
     public DaResourceRow() {
-    }
-
-    public DaResourceRow(
-            String namespace,
-            String pod,
-            String containerName,
-            BigDecimal cpuRequestCores,
-            BigDecimal cpuLimitCores,
-            BigDecimal cpuUsedCores,
-            long ramRequestBytes,
-            long ramLimitBytes,
-            long ramUsedBytes,
-            int sourceLineNumber) {
-        this.namespace = namespace;
-        this.pod = pod;
-        this.containerName = containerName;
-        this.cpuRequestCores = cpuRequestCores;
-        this.cpuLimitCores = cpuLimitCores;
-        this.cpuUsedCores = cpuUsedCores;
-        this.ramRequestBytes = ramRequestBytes;
-        this.ramLimitBytes = ramLimitBytes;
-        this.ramUsedBytes = ramUsedBytes;
-        this.sourceLineNumber = sourceLineNumber;
     }
 
     public String getNamespace() {
@@ -63,6 +48,14 @@ public class DaResourceRow {
 
     public void setPod(String pod) {
         this.pod = pod;
+    }
+
+    public String getDeployment() {
+        return deployment;
+    }
+
+    public void setDeployment(String deployment) {
+        this.deployment = deployment;
     }
 
     public String getContainerName() {
@@ -97,28 +90,76 @@ public class DaResourceRow {
         this.cpuUsedCores = cpuUsedCores;
     }
 
-    public long getRamRequestBytes() {
+    public Long getRamRequestBytes() {
         return ramRequestBytes;
     }
 
-    public void setRamRequestBytes(long ramRequestBytes) {
+    public void setRamRequestBytes(Long ramRequestBytes) {
         this.ramRequestBytes = ramRequestBytes;
     }
 
-    public long getRamLimitBytes() {
+    public Long getRamLimitBytes() {
         return ramLimitBytes;
     }
 
-    public void setRamLimitBytes(long ramLimitBytes) {
+    public void setRamLimitBytes(Long ramLimitBytes) {
         this.ramLimitBytes = ramLimitBytes;
     }
 
-    public long getRamUsedBytes() {
+    public Long getRamUsedBytes() {
         return ramUsedBytes;
     }
 
-    public void setRamUsedBytes(long ramUsedBytes) {
+    public void setRamUsedBytes(Long ramUsedBytes) {
         this.ramUsedBytes = ramUsedBytes;
+    }
+
+    public String getCpuRequestDisplay() {
+        return cpuRequestDisplay;
+    }
+
+    public void setCpuRequestDisplay(String cpuRequestDisplay) {
+        this.cpuRequestDisplay = cpuRequestDisplay;
+    }
+
+    public String getCpuLimitDisplay() {
+        return cpuLimitDisplay;
+    }
+
+    public void setCpuLimitDisplay(String cpuLimitDisplay) {
+        this.cpuLimitDisplay = cpuLimitDisplay;
+    }
+
+    public String getCpuUsedDisplay() {
+        return cpuUsedDisplay;
+    }
+
+    public void setCpuUsedDisplay(String cpuUsedDisplay) {
+        this.cpuUsedDisplay = cpuUsedDisplay;
+    }
+
+    public String getRamRequestDisplay() {
+        return ramRequestDisplay;
+    }
+
+    public void setRamRequestDisplay(String ramRequestDisplay) {
+        this.ramRequestDisplay = ramRequestDisplay;
+    }
+
+    public String getRamLimitDisplay() {
+        return ramLimitDisplay;
+    }
+
+    public void setRamLimitDisplay(String ramLimitDisplay) {
+        this.ramLimitDisplay = ramLimitDisplay;
+    }
+
+    public String getRamUsedDisplay() {
+        return ramUsedDisplay;
+    }
+
+    public void setRamUsedDisplay(String ramUsedDisplay) {
+        this.ramUsedDisplay = ramUsedDisplay;
     }
 
     public int getSourceLineNumber() {
@@ -129,8 +170,8 @@ public class DaResourceRow {
         this.sourceLineNumber = sourceLineNumber;
     }
 
-    /** Ключ для сопоставления одинаковых записей между двумя файлами: namespace → pod → container. */
-    public String resourceKey() {
-        return namespace + '\u001e' + pod + '\u001e' + containerName;
+    /** Ключ сопоставления: namespace, deployment, container. */
+    public String joinKey() {
+        return namespace + '\u001e' + deployment + '\u001e' + containerName;
     }
 }
