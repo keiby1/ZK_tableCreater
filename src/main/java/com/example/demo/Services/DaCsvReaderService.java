@@ -6,11 +6,14 @@ import com.example.demo.DTO.DaResourceRow;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,10 +48,36 @@ public class DaCsvReaderService {
 
     public DaCsvDocument read(MultipartFile file) throws IOException {
         String name = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload";
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = openReader(file.getInputStream())) {
             return read(reader, name);
         }
+    }
+
+    /**
+     * UTF-8 (DA_File*.csv), UTF-16 LE/BE с BOM (частый экспорт Excel, example2.csv).
+     */
+    private static BufferedReader openReader(InputStream inputStream) throws IOException {
+        InputStream in = inputStream.markSupported() ? inputStream : new BufferedInputStream(inputStream);
+        Charset charset = detectCharset(in);
+        return new BufferedReader(new InputStreamReader(in, charset));
+    }
+
+    private static Charset detectCharset(InputStream in) throws IOException {
+        in.mark(4);
+        int b0 = in.read();
+        int b1 = in.read();
+        int b2 = in.read();
+        in.reset();
+        if (b0 == 0xFF && b1 == 0xFE) {
+            return StandardCharsets.UTF_16LE;
+        }
+        if (b0 == 0xFE && b1 == 0xFF) {
+            return StandardCharsets.UTF_16BE;
+        }
+        if (b0 == 0xEF && b1 == 0xBB && b2 == 0xBF) {
+            return StandardCharsets.UTF_8;
+        }
+        return StandardCharsets.UTF_8;
     }
 
     public DaCsvDocument read(BufferedReader reader, String sourceName) throws IOException {
@@ -61,7 +90,8 @@ public class DaCsvReaderService {
         if (first.isEmpty()) {
             throw new DaCsvParseException(sourceName, lineNum, "Первая строка файла пуста");
         }
-        Map<Integer, Integer> colIndexByExpected = parseHeader(first, sourceName, lineNum);
+        char delimiter = detectDelimiter(first, sourceName, lineNum);
+        Map<Integer, Integer> colIndexByExpected = parseHeader(first, delimiter, sourceName, lineNum);
         List<DaResourceRow> rows = new ArrayList<>();
 
         String line;
@@ -70,7 +100,10 @@ public class DaCsvReaderService {
             if (line.isBlank()) {
                 continue;
             }
-            List<String> cols = splitCsvLine(line);
+            List<String> cols = splitDelimitedLine(line, delimiter);
+            if (isEmptyDataRow(cols, colIndexByExpected)) {
+                continue;
+            }
             if (cols.size() < EXPECTED_HEADERS.size()) {
                 throw new DaCsvParseException(sourceName, lineNum,
                         "Ожидалось не менее " + EXPECTED_HEADERS.size() + " столбцов, получено " + cols.size());
@@ -81,8 +114,34 @@ public class DaCsvReaderService {
         return new DaCsvDocument(sourceName, rows);
     }
 
-    private static Map<Integer, Integer> parseHeader(String headerLine, String sourceName, int lineNum) {
-        List<String> headers = splitCsvLine(headerLine);
+    /**
+     * Разделитель: точка с запятой (Excel RU), табуляция или запятая (как в DA_File*.csv).
+     */
+    private static char detectDelimiter(String headerLine, String sourceName, int lineNum) {
+        char[] candidates = {';', '\t', ','};
+        for (char delimiter : candidates) {
+            List<String> headers = splitDelimitedLine(headerLine, delimiter);
+            if (headerContainsAllExpected(headers)) {
+                return delimiter;
+            }
+        }
+        throw new DaCsvParseException(sourceName, lineNum,
+                "Не удалось определить разделитель CSV (ожидаются «;», табуляция или «,») "
+                        + "или не найдены обязательные столбцы");
+    }
+
+    private static boolean headerContainsAllExpected(List<String> headers) {
+        for (String wanted : EXPECTED_HEADERS) {
+            if (indexOfIgnoreCase(headers, wanted) < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Map<Integer, Integer> parseHeader(
+            String headerLine, char delimiter, String sourceName, int lineNum) {
+        List<String> headers = splitDelimitedLine(headerLine, delimiter);
         Map<Integer, Integer> map = new HashMap<>();
         for (int i = 0; i < EXPECTED_HEADERS.size(); i++) {
             String wanted = EXPECTED_HEADERS.get(i);
@@ -94,6 +153,26 @@ public class DaCsvReaderService {
             map.put(i, idx);
         }
         return map;
+    }
+
+    /** Строка без данных (только разделители / пустые ячейки) — пропускаем. */
+    private static boolean isEmptyDataRow(List<String> cols, Map<Integer, Integer> colIdx) {
+        boolean anyNonEmpty = false;
+        for (String cell : cols) {
+            if (cell != null && !cell.isBlank() && !isMissingToken(cell)) {
+                anyNonEmpty = true;
+                break;
+            }
+        }
+        if (!anyNonEmpty) {
+            return true;
+        }
+        String ns = getCol(cols, colIdx, 0);
+        String pod = getCol(cols, colIdx, 1);
+        String container = getCol(cols, colIdx, 2);
+        return (ns == null || ns.isBlank())
+                && (pod == null || pod.isBlank())
+                && (container == null || container.isBlank());
     }
 
     private static DaResourceRow parseDataRow(
@@ -224,7 +303,26 @@ public class DaCsvReaderService {
         }
     }
 
-    private static List<String> splitCsvLine(String line) {
+    private static List<String> splitDelimitedLine(String line, char delimiter) {
+        if (delimiter == ',') {
+            return splitCsvLineComma(line);
+        }
+        List<String> parts = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == delimiter) {
+                parts.add(unquoteField(cur.toString().trim()));
+                cur.setLength(0);
+            } else {
+                cur.append(c);
+            }
+        }
+        parts.add(unquoteField(cur.toString().trim()));
+        return parts;
+    }
+
+    private static List<String> splitCsvLineComma(String line) {
         List<String> parts = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
         boolean inQuotes = false;
