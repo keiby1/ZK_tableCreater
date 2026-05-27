@@ -10,12 +10,13 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * HTML-таблица сравнения двух CSV ДА: ключевые столбцы слева, метрики файла 1, метрики файла 2.
+ * HTML-таблица сравнения двух CSV ДА: колонка выбора для графика, ключевые столбцы, метрики файла 1, метрики файла 2.
  */
 @Service
 public class DaCsvComparisonHtmlService {
 
-    private static final int KEY_COLUMN_COUNT = 4;
+    /** Namespace, Deployment, Pod, Container и колонка с чекбоксом для графика */
+    private static final int KEY_COLUMN_COUNT = 5;
 
     private static final String[][] METRIC_COLUMNS = {
             {"cpu-requests", "CPU Requests"},
@@ -97,10 +98,27 @@ public class DaCsvComparisonHtmlService {
         html.append("    .col-picker-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }\n");
         html.append("    .col-hidden { display: none !important; }\n");
         html.append("    .back-link { margin-top: 16px; }\n");
+        html.append("    .chart-panel { margin-bottom: 16px; padding: 12px 16px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }\n");
+        html.append("    .chart-panel h3 { margin: 0 0 10px 0; font-size: 0.95em; color: #2e7d32; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }\n");
+        html.append("    .chart-panel .chart-canvas-wrap { position: relative; height: 320px; }\n");
+        html.append("    th.chart-pick, td.chart-pick { width: 36px; min-width: 36px; text-align: center; vertical-align: middle; }\n");
+        html.append("    td.chart-pick input { cursor: pointer; accent-color: #4CAF50; }\n");
         html.append("  </style>\n");
+        html.append("  <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>\n");
         html.append("</head>\n");
         html.append("<body>\n");
         html.append(appLayoutService.buildAppHeader());
+        html.append("  <div class=\"chart-panel\" id=\"da-chart-panel\" data-file-left=\"")
+                .append(escapeHtmlAttr(name1)).append("\" data-file-right=\"").append(escapeHtmlAttr(name2)).append("\">\n");
+        html.append("    <h3>Диаграмма выбранных строк\n");
+        html.append("      <button type=\"button\" class=\"filter-btn filter-btn-secondary\" id=\"row-chart-reset\">Сбросить выбор строк</button>\n");
+        html.append("    </h3>\n");
+        html.append("    <p id=\"da-chart-empty\" style=\"display:none; margin: 0 0 10px 0; font-size: 0.9em; color: #757575;\">Нет данных для графика: отметьте строки в первом столбце таблицы и включите нужные столбцы метрик.</p>\n");
+        html.append("    <p style=\"margin: 0 0 10px 0; font-size: 0.88em; color: #616161;\">Отметьте строки в таблице слева. По оси X — 0 и 10; по Y — числовые значения включённых столбцов метрик ")
+                .append("(линия горизонтальная: одинаковое Y в точках 0 и 10). ")
+                .append("CPU и RAM вынесены на разные шкалы Y; подписи RAM в KiB/MiB/GiB.</p>\n");
+        html.append("    <div class=\"chart-canvas-wrap\"><canvas id=\"da-compare-chart\"></canvas></div>\n");
+        html.append("  </div>\n");
         html.append("  <div class=\"compare-header\">\n");
         html.append("    <h2>Сравнение: ").append(escapeHtml(name1)).append(" и ").append(escapeHtml(name2)).append("</h2>\n");
         html.append("    <p>Слева — метрики из <strong>").append(escapeHtml(name1)).append("</strong>, ");
@@ -165,12 +183,15 @@ public class DaCsvComparisonHtmlService {
         html.append("      <thead>\n");
         html.append("        <tr>\n");
         html.append("          <th colspan=\"").append(KEY_COLUMN_COUNT).append("\" class=\"key-col\">Ключ</th>\n");
-        html.append("          <th colspan=\"6\" class=\"group-left\" id=\"header-group-left\">")
+        html.append("          <th colspan=\"").append(METRIC_COLUMNS.length)
+                .append("\" class=\"group-left\" id=\"header-group-left\">")
                 .append(escapeHtml(name1)).append("</th>\n");
-        html.append("          <th colspan=\"6\" class=\"group-right\" id=\"header-group-right\">")
+        html.append("          <th colspan=\"").append(METRIC_COLUMNS.length)
+                .append("\" class=\"group-right\" id=\"header-group-right\">")
                 .append(escapeHtml(name2)).append("</th>\n");
         html.append("        </tr>\n");
         html.append("        <tr>\n");
+        html.append("          <th class=\"key-col chart-pick\" title=\"На диаграмму\">Гр.</th>\n");
         html.append("          <th class=\"key-col\">Namespace</th>\n");
         html.append("          <th class=\"key-col\">Deployment</th>\n");
         html.append("          <th class=\"key-col\">Pod</th>\n");
@@ -194,7 +215,10 @@ public class DaCsvComparisonHtmlService {
                     .append(escapeHtmlAttr(row.getNamespace())).append("\" data-pod=\"")
                     .append(escapeHtmlAttr(row.getPod())).append("\" data-deployment=\"")
                     .append(escapeHtmlAttr(row.getDeployment())).append("\" data-container=\"")
-                    .append(escapeHtmlAttr(row.getContainerName())).append("\">\n");
+                    .append(escapeHtmlAttr(row.getContainerName())).append("\"");
+            appendChartDataAttributes(html, left, right);
+            html.append(">\n");
+            html.append("          <td class=\"key-col chart-pick\"><input type=\"checkbox\" class=\"row-chart-toggle\" aria-label=\"Показать на диаграмме\"></td>\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getNamespace())).append("</td>\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getDeployment())).append("</td>\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getPod())).append("</td>\n");
@@ -239,6 +263,7 @@ public class DaCsvComparisonHtmlService {
         html.append("          if (show) visible++;\n");
         html.append("        });\n");
         html.append("        countEl.textContent = 'Показано: ' + visible + ' из ' + rows.length;\n");
+        html.append("        if (typeof window.refreshDaCompareChart === 'function') window.refreshDaCompareChart();\n");
         html.append("      }\n");
         html.append("      [nsInput, depInput, podInput, contInput].forEach(function(el) {\n");
         html.append("        el.addEventListener('input', applyFilter);\n");
@@ -268,6 +293,7 @@ public class DaCsvComparisonHtmlService {
         html.append("        });\n");
         html.append("        if (headerLeft) headerLeft.colSpan = Math.max(visible, 1);\n");
         html.append("        if (headerRight) headerRight.colSpan = Math.max(visible, 1);\n");
+        html.append("        if (typeof window.refreshDaCompareChart === 'function') window.refreshDaCompareChart();\n");
         html.append("      }\n");
         html.append("      toggles.forEach(function(cb) { cb.addEventListener('change', applyColumnVisibility); });\n");
         html.append("      document.getElementById('col-show-all').addEventListener('click', function() {\n");
@@ -280,10 +306,197 @@ public class DaCsvComparisonHtmlService {
         html.append("      });\n");
         html.append("      applyColumnVisibility();\n");
         html.append("    })();\n");
+        html.append("    (function() {\n");
+        html.append("      var panel = document.getElementById('da-chart-panel');\n");
+        html.append("      var canvas = document.getElementById('da-compare-chart');\n");
+        html.append("      var emptyEl = document.getElementById('da-chart-empty');\n");
+        html.append("      var tbody = document.getElementById('da-compare-tbody');\n");
+        html.append("      var resetBtn = document.getElementById('row-chart-reset');\n");
+        html.append("      if (!canvas || !panel) return;\n");
+        html.append("      var chartInst = null;\n");
+        html.append("      var METRIC_TITLE = { 'cpu-requests': 'CPU Requests', 'cpu-limits': 'CPU Limits', 'cpu-used': 'CPU Used',\n");
+        html.append("        'ram-requests': 'RAM Requests', 'ram-limits': 'RAM Limits', 'ram-used': 'RAM Used' };\n");
+        html.append("      var CPU_COLS = { 'cpu-requests': 1, 'cpu-limits': 1, 'cpu-used': 1 };\n");
+        html.append("      function fileName(side) {\n");
+        html.append("        return side === 'r' ? (panel.getAttribute('data-file-right') || 'Файл 2') : (panel.getAttribute('data-file-left') || 'Файл 1');\n");
+        html.append("      }\n");
+        html.append("      function formatBytesHuman(bytes) {\n");
+        html.append("        var n = Number(bytes);\n");
+        html.append("        if (!isFinite(n) || n < 0) return String(bytes);\n");
+        html.append("        var u = ['B','KiB','MiB','GiB','TiB','PiB'];\n");
+        html.append("        var i = 0, v = n;\n");
+        html.append("        while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }\n");
+        html.append("        var d = v >= 100 ? 0 : (v >= 10 ? 1 : 2);\n");
+        html.append("        return v.toFixed(d).replace(/\\.?0+$/, '') + ' ' + u[i];\n");
+        html.append("      }\n");
+        html.append("      function formatBytesTick(value) {\n");
+        html.append("        return formatBytesHuman(value);\n");
+        html.append("      }\n");
+        html.append("      function rowVisible(tr) { return tr.style.display !== 'none'; }\n");
+        html.append("      function rowLabel(tr) {\n");
+        html.append("        var ns = tr.getAttribute('data-namespace') || '';\n");
+        html.append("        var c = tr.getAttribute('data-container') || '';\n");
+        html.append("        return (ns + '/' + c).substring(0, 48);\n");
+        html.append("      }\n");
+        html.append("      function hueFor(rowIdx, side, colId) {\n");
+        html.append("        var h = (rowIdx * 53 + (side === 'r' ? 19 : 0) + ('' + colId).length * 7) % 360;\n");
+        html.append("        return 'hsl(' + h + ',65%,45%)';\n");
+        html.append("      }\n");
+        html.append("      function refreshDaCompareChart() {\n");
+        html.append("        if (typeof Chart === 'undefined') return;\n");
+        html.append("        var cols = [];\n");
+        html.append("        document.querySelectorAll('.col-toggle:checked').forEach(function(cb) {\n");
+        html.append("          cols.push(cb.getAttribute('data-col'));\n");
+        html.append("        });\n");
+        html.append("        var datasets = [];\n");
+        html.append("        var rowIdx = 0;\n");
+        html.append("        document.querySelectorAll('#da-compare-tbody tr.data-row').forEach(function(tr) {\n");
+        html.append("          var chk = tr.querySelector('.row-chart-toggle');\n");
+        html.append("          if (!chk || !chk.checked || !rowVisible(tr)) return;\n");
+        html.append("          rowIdx++;\n");
+        html.append("          var rlab = rowLabel(tr);\n");
+        html.append("          cols.forEach(function(colId) {\n");
+        html.append("            ['l','r'].forEach(function(side) {\n");
+        html.append("              var attr = tr.getAttribute('data-chart-' + side + '-' + colId);\n");
+        html.append("              if (attr === null || attr === '') return;\n");
+        html.append("              var num = parseFloat(attr);\n");
+        html.append("              if (!isFinite(num)) return;\n");
+        html.append("              var isCpu = CPU_COLS.hasOwnProperty(colId);\n");
+        html.append("              var title = METRIC_TITLE[colId] || colId;\n");
+        html.append("              datasets.push({\n");
+        html.append("                label: rlab + ' · ' + fileName(side) + ' · ' + title,\n");
+        html.append("                data: [{ x: 0, y: num }, { x: 10, y: num }],\n");
+        html.append("                yAxisID: isCpu ? 'y-cpu' : 'y-ram',\n");
+        html.append("                borderColor: hueFor(rowIdx, side, colId),\n");
+        html.append("                backgroundColor: 'transparent',\n");
+        html.append("                borderWidth: 2,\n");
+        html.append("                fill: false,\n");
+        html.append("                pointRadius: 3,\n");
+        html.append("                tension: 0,\n");
+        html.append("                spanGaps: true\n");
+        html.append("              });\n");
+        html.append("            });\n");
+        html.append("          });\n");
+        html.append("        });\n");
+        html.append("        var needsCpu = datasets.some(function(d) { return d.yAxisID === 'y-cpu'; });\n");
+        html.append("        var needsRam = datasets.some(function(d) { return d.yAxisID === 'y-ram'; });\n");
+        html.append("        if (chartInst) { chartInst.destroy(); chartInst = null; }\n");
+        html.append("        if (datasets.length === 0) {\n");
+        html.append("          canvas.style.display = 'none';\n");
+        html.append("          if (emptyEl) emptyEl.style.display = 'block';\n");
+        html.append("          return;\n");
+        html.append("        }\n");
+        html.append("        canvas.style.display = 'block';\n");
+        html.append("        if (emptyEl) emptyEl.style.display = 'none';\n");
+        html.append("        chartInst = new Chart(canvas.getContext('2d'), {\n");
+        html.append("          type: 'line',\n");
+        html.append("          data: { datasets: datasets },\n");
+        html.append("          options: {\n");
+        html.append("            responsive: true,\n");
+        html.append("            maintainAspectRatio: false,\n");
+        html.append("            interaction: { mode: 'nearest', intersect: false },\n");
+        html.append("            scales: {\n");
+        html.append("              x: {\n");
+        html.append("                type: 'linear',\n");
+        html.append("                min: 0,\n");
+        html.append("                max: 10,\n");
+        html.append("                title: { display: true, text: 'X' }\n");
+        html.append("              },\n");
+        html.append("              'y-cpu': {\n");
+        html.append("                type: 'linear',\n");
+        html.append("                position: 'left',\n");
+        html.append("                display: needsCpu,\n");
+        html.append("                title: { display: true, text: 'CPU (ядер)' },\n");
+        html.append("                min: 0\n");
+        html.append("              },\n");
+        html.append("              'y-ram': {\n");
+        html.append("                type: 'linear',\n");
+        html.append("                position: (needsCpu && needsRam) ? 'right' : 'left',\n");
+        html.append("                display: needsRam,\n");
+        html.append("                title: { display: true, text: 'RAM' },\n");
+        html.append("                min: 0,\n");
+        html.append("                ticks: {\n");
+        html.append("                  callback: function(v) { return formatBytesTick(v); }\n");
+        html.append("                }\n");
+        html.append("              }\n");
+        html.append("            },\n");
+        html.append("            plugins: {\n");
+        html.append("              legend: { position: 'bottom' },\n");
+        html.append("              tooltip: {\n");
+        html.append("                callbacks: {\n");
+        html.append("                  label: function(ctx) {\n");
+        html.append("                    var y = ctx.parsed.y;\n");
+        html.append("                    if (ctx.dataset.yAxisID === 'y-ram') return ctx.dataset.label + ': ' + formatBytesHuman(y);\n");
+        html.append("                    return ctx.dataset.label + ': ' + y + ' ядер';\n");
+        html.append("                  }\n");
+        html.append("                }\n");
+        html.append("              }\n");
+        html.append("            }\n");
+        html.append("          }\n");
+        html.append("        });\n");
+        html.append("      }\n");
+        html.append("      window.refreshDaCompareChart = refreshDaCompareChart;\n");
+        html.append("      if (tbody) {\n");
+        html.append("        tbody.addEventListener('change', function(e) {\n");
+        html.append("          if (e.target && e.target.classList && e.target.classList.contains('row-chart-toggle')) refreshDaCompareChart();\n");
+        html.append("        });\n");
+        html.append("      }\n");
+        html.append("      if (resetBtn) {\n");
+        html.append("        resetBtn.addEventListener('click', function() {\n");
+        html.append("          document.querySelectorAll('.row-chart-toggle').forEach(function(cb) { cb.checked = false; });\n");
+        html.append("          refreshDaCompareChart();\n");
+        html.append("        });\n");
+        html.append("      }\n");
+        html.append("      refreshDaCompareChart();\n");
+        html.append("    })();\n");
         html.append("  </script>\n");
         html.append("</body>\n");
         html.append("</html>");
         return html.toString();
+    }
+
+    /**
+     * Числа для диаграммы в {@code data-chart-l-*} / {@code data-chart-r-*}: CPU в ядрах, RAM в байтах.
+     */
+    private static void appendChartDataAttributes(StringBuilder html, DaResourceRow left, DaResourceRow right) {
+        appendSideChartNumericAttrs(html, left, 'l');
+        appendSideChartNumericAttrs(html, right, 'r');
+    }
+
+    private static void appendSideChartNumericAttrs(StringBuilder html, DaResourceRow row, char side) {
+        if (row == null) {
+            return;
+        }
+        BigDecimal v;
+        v = row.getCpuRequestCores();
+        if (v != null) {
+            appendChartAttr(html, "data-chart-" + side + "-cpu-requests", v.toPlainString());
+        }
+        v = row.getCpuLimitCores();
+        if (v != null) {
+            appendChartAttr(html, "data-chart-" + side + "-cpu-limits", v.toPlainString());
+        }
+        v = row.getCpuUsedCores();
+        if (v != null) {
+            appendChartAttr(html, "data-chart-" + side + "-cpu-used", v.toPlainString());
+        }
+        Long b;
+        b = row.getRamRequestBytes();
+        if (b != null) {
+            appendChartAttr(html, "data-chart-" + side + "-ram-requests", String.valueOf(b));
+        }
+        b = row.getRamLimitBytes();
+        if (b != null) {
+            appendChartAttr(html, "data-chart-" + side + "-ram-limits", String.valueOf(b));
+        }
+        b = row.getRamUsedBytes();
+        if (b != null) {
+            appendChartAttr(html, "data-chart-" + side + "-ram-used", String.valueOf(b));
+        }
+    }
+
+    private static void appendChartAttr(StringBuilder html, String name, String value) {
+        html.append(' ').append(name).append("=\"").append(escapeHtmlAttr(value)).append("\"");
     }
 
     /**
