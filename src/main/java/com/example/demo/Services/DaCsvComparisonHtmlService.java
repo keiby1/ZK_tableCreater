@@ -15,6 +15,15 @@ import java.util.function.Function;
 @Service
 public class DaCsvComparisonHtmlService {
 
+    private static final String[][] METRIC_COLUMNS = {
+            {"cpu-requests", "CPU Requests"},
+            {"cpu-limits", "CPU Limits"},
+            {"cpu-used", "CPU Used"},
+            {"ram-requests", "RAM Requests"},
+            {"ram-limits", "RAM Limits"},
+            {"ram-used", "RAM Used"},
+    };
+
     @Autowired
     private AppLayoutService appLayoutService;
 
@@ -78,6 +87,13 @@ public class DaCsvComparisonHtmlService {
         html.append("    .filter-btn-secondary { background: #fff; color: #4CAF50; border: 1px solid #4CAF50; }\n");
         html.append("    .filter-btn-secondary:hover { background: #e8f5e9; }\n");
         html.append("    .filter-count { font-size: 0.9em; color: #616161; }\n");
+        html.append("    .col-picker { margin-bottom: 16px; padding: 12px 16px; background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }\n");
+        html.append("    .col-picker h3 { margin: 0 0 10px 0; font-size: 0.95em; color: #2e7d32; }\n");
+        html.append("    .col-picker-list { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; }\n");
+        html.append("    .col-picker-item { display: flex; align-items: center; gap: 6px; font-size: 0.92em; color: #424242; cursor: pointer; }\n");
+        html.append("    .col-picker-item input { cursor: pointer; accent-color: #4CAF50; }\n");
+        html.append("    .col-picker-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }\n");
+        html.append("    .col-hidden { display: none !important; }\n");
         html.append("    .back-link { margin-top: 16px; }\n");
         html.append("  </style>\n");
         html.append("</head>\n");
@@ -122,30 +138,43 @@ public class DaCsvComparisonHtmlService {
         html.append("      </div>\n");
         html.append("    </div>\n");
         html.append("  </div>\n");
+        html.append("  <div class=\"col-picker\">\n");
+        html.append("    <h3>Столбцы метрик</h3>\n");
+        html.append("    <div class=\"col-picker-list\">\n");
+        for (String[] col : METRIC_COLUMNS) {
+            html.append("      <label class=\"col-picker-item\">")
+                    .append("<input type=\"checkbox\" class=\"col-toggle\" id=\"col-")
+                    .append(col[0]).append("\" data-col=\"").append(col[0]).append("\" checked> ")
+                    .append(escapeHtml(col[1])).append("</label>\n");
+        }
+        html.append("    </div>\n");
+        html.append("    <div class=\"col-picker-actions\">\n");
+        html.append("      <button type=\"button\" class=\"filter-btn filter-btn-secondary\" id=\"col-show-all\">Показать все</button>\n");
+        html.append("      <button type=\"button\" class=\"filter-btn filter-btn-secondary\" id=\"col-hide-all\">Скрыть все</button>\n");
+        html.append("    </div>\n");
+        html.append("  </div>\n");
         html.append("  <div class=\"table-wrap\">\n");
         html.append("    <table id=\"da-compare-table\">\n");
         html.append("      <thead>\n");
         html.append("        <tr>\n");
         html.append("          <th colspan=\"3\" class=\"key-col\">Ключ</th>\n");
-        html.append("          <th colspan=\"6\" class=\"group-left\">").append(escapeHtml(name1)).append("</th>\n");
-        html.append("          <th colspan=\"6\" class=\"group-right\">").append(escapeHtml(name2)).append("</th>\n");
+        html.append("          <th colspan=\"6\" class=\"group-left\" id=\"header-group-left\">")
+                .append(escapeHtml(name1)).append("</th>\n");
+        html.append("          <th colspan=\"6\" class=\"group-right\" id=\"header-group-right\">")
+                .append(escapeHtml(name2)).append("</th>\n");
         html.append("        </tr>\n");
         html.append("        <tr>\n");
         html.append("          <th class=\"key-col\">Namespace</th>\n");
         html.append("          <th class=\"key-col\">Deployment</th>\n");
         html.append("          <th class=\"key-col\">Container</th>\n");
-        html.append("          <th class=\"group-left\">CPU Requests</th>\n");
-        html.append("          <th class=\"group-left\">CPU Limits</th>\n");
-        html.append("          <th class=\"group-left\">CPU Used</th>\n");
-        html.append("          <th class=\"group-left\">RAM Requests</th>\n");
-        html.append("          <th class=\"group-left\">RAM Limits</th>\n");
-        html.append("          <th class=\"group-left\">RAM Used</th>\n");
-        html.append("          <th class=\"group-right\">CPU Requests</th>\n");
-        html.append("          <th class=\"group-right\">CPU Limits</th>\n");
-        html.append("          <th class=\"group-right\">CPU Used</th>\n");
-        html.append("          <th class=\"group-right\">RAM Requests</th>\n");
-        html.append("          <th class=\"group-right\">RAM Limits</th>\n");
-        html.append("          <th class=\"group-right\">RAM Used</th>\n");
+        for (String[] col : METRIC_COLUMNS) {
+            html.append("          <th class=\"group-left col-metric col-").append(col[0]).append("\">")
+                    .append(escapeHtml(col[1])).append("</th>\n");
+        }
+        for (String[] col : METRIC_COLUMNS) {
+            html.append("          <th class=\"group-right col-metric col-").append(col[0]).append("\">")
+                    .append(escapeHtml(col[1])).append("</th>\n");
+        }
         html.append("        </tr>\n");
         html.append("      </thead>\n");
         html.append("      <tbody id=\"da-compare-tbody\">\n");
@@ -208,6 +237,34 @@ public class DaCsvComparisonHtmlService {
         html.append("      });\n");
         html.append("      applyFilter();\n");
         html.append("    })();\n");
+        html.append("    (function() {\n");
+        html.append("      var toggles = document.querySelectorAll('.col-toggle');\n");
+        html.append("      var headerLeft = document.getElementById('header-group-left');\n");
+        html.append("      var headerRight = document.getElementById('header-group-right');\n");
+        html.append("      function applyColumnVisibility() {\n");
+        html.append("        var visible = 0;\n");
+        html.append("        toggles.forEach(function(cb) {\n");
+        html.append("          var colId = cb.getAttribute('data-col');\n");
+        html.append("          var show = cb.checked;\n");
+        html.append("          if (show) visible++;\n");
+        html.append("          document.querySelectorAll('.col-' + colId).forEach(function(el) {\n");
+        html.append("            if (show) el.classList.remove('col-hidden'); else el.classList.add('col-hidden');\n");
+        html.append("          });\n");
+        html.append("        });\n");
+        html.append("        if (headerLeft) headerLeft.colSpan = Math.max(visible, 1);\n");
+        html.append("        if (headerRight) headerRight.colSpan = Math.max(visible, 1);\n");
+        html.append("      }\n");
+        html.append("      toggles.forEach(function(cb) { cb.addEventListener('change', applyColumnVisibility); });\n");
+        html.append("      document.getElementById('col-show-all').addEventListener('click', function() {\n");
+        html.append("        toggles.forEach(function(cb) { cb.checked = true; });\n");
+        html.append("        applyColumnVisibility();\n");
+        html.append("      });\n");
+        html.append("      document.getElementById('col-hide-all').addEventListener('click', function() {\n");
+        html.append("        toggles.forEach(function(cb) { cb.checked = false; });\n");
+        html.append("        applyColumnVisibility();\n");
+        html.append("      });\n");
+        html.append("      applyColumnVisibility();\n");
+        html.append("    })();\n");
         html.append("  </script>\n");
         html.append("</body>\n");
         html.append("</html>");
@@ -219,12 +276,18 @@ public class DaCsvComparisonHtmlService {
      */
     private static void appendComparedMetricsRow(StringBuilder html, DaResourceRow left, DaResourceRow right) {
         MetricColumn[] columns = {
-                new MetricColumn(DaResourceRow::getCpuRequestDisplay, DaResourceRow::getCpuRequestCores, true),
-                new MetricColumn(DaResourceRow::getCpuLimitDisplay, DaResourceRow::getCpuLimitCores, true),
-                new MetricColumn(DaResourceRow::getCpuUsedDisplay, DaResourceRow::getCpuUsedCores, true),
-                new MetricColumn(DaResourceRow::getRamRequestDisplay, DaResourceRow::getRamRequestBytes, false),
-                new MetricColumn(DaResourceRow::getRamLimitDisplay, DaResourceRow::getRamLimitBytes, false),
-                new MetricColumn(DaResourceRow::getRamUsedDisplay, DaResourceRow::getRamUsedBytes, false),
+                new MetricColumn("cpu-requests", DaResourceRow::getCpuRequestDisplay,
+                        DaResourceRow::getCpuRequestCores, true),
+                new MetricColumn("cpu-limits", DaResourceRow::getCpuLimitDisplay,
+                        DaResourceRow::getCpuLimitCores, true),
+                new MetricColumn("cpu-used", DaResourceRow::getCpuUsedDisplay,
+                        DaResourceRow::getCpuUsedCores, true),
+                new MetricColumn("ram-requests", DaResourceRow::getRamRequestDisplay,
+                        DaResourceRow::getRamRequestBytes, false),
+                new MetricColumn("ram-limits", DaResourceRow::getRamLimitDisplay,
+                        DaResourceRow::getRamLimitBytes, false),
+                new MetricColumn("ram-used", DaResourceRow::getRamUsedDisplay,
+                        DaResourceRow::getRamUsedBytes, false),
         };
         String[] leftDisplays = new String[columns.length];
         String[] rightDisplays = new String[columns.length];
@@ -238,22 +301,25 @@ public class DaCsvComparisonHtmlService {
         }
 
         for (int i = 0; i < columns.length; i++) {
-            appendMetricCell(html, leftDisplays[i], false, levels[i]);
+            appendMetricCell(html, leftDisplays[i], false, levels[i], columns[i].columnId);
         }
         for (int i = 0; i < columns.length; i++) {
-            appendMetricCell(html, rightDisplays[i], true, levels[i]);
+            appendMetricCell(html, rightDisplays[i], true, levels[i], columns[i].columnId);
         }
     }
 
     private static final class MetricColumn {
+        final String columnId;
         final Function<DaResourceRow, String> displayGetter;
         final Function<DaResourceRow, ?> numericGetter;
         final boolean cpu;
 
         MetricColumn(
+                String columnId,
                 Function<DaResourceRow, String> displayGetter,
                 Function<DaResourceRow, ?> numericGetter,
                 boolean cpu) {
+            this.columnId = columnId;
             this.displayGetter = displayGetter;
             this.numericGetter = numericGetter;
             this.cpu = cpu;
@@ -293,11 +359,13 @@ public class DaCsvComparisonHtmlService {
             StringBuilder html,
             String value,
             boolean rightGroup,
-            DaCsvMetricCompareLevel level) {
+            DaCsvMetricCompareLevel level,
+            String columnId) {
         String group = rightGroup ? " group-right" : "";
         String cmp = " " + level.getCssClass();
+        String col = " col-metric col-" + columnId;
         String display = value != null ? value : "";
-        html.append("          <td class=\"").append((group + cmp).trim()).append("\">");
+        html.append("          <td class=\"").append((group + col + cmp).trim()).append("\">");
         if (!display.isEmpty()) {
             html.append(escapeHtml(display));
         }
