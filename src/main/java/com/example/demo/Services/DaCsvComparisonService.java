@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Сопоставление двух выгрузок ДА: left join по namespace, deployment, container
@@ -45,7 +46,8 @@ public class DaCsvComparisonService {
             DaCompareRow row = new DaCompareRow();
             row.setLeft(l);
             row.setRight(r);
-            row.setNamespace(displayNamespace(l, r));
+            row.setNamespace(firstNonBlank(l, r, DaResourceRow::getNamespace));
+            row.setPod(firstNonBlank(l, r, DaResourceRow::getPod));
             row.setDeployment(firstNonBlank(l, r, DaResourceRow::getDeployment));
             row.setContainerName(firstNonBlank(l, r, DaResourceRow::getContainerName));
             result.add(row);
@@ -66,23 +68,10 @@ public class DaCsvComparisonService {
         return index < p.length ? p[index] : "";
     }
 
-    /**
-     * Namespace из данных; если строка есть только во 2-м файле — в колонку Namespace выводится полное имя Pod.
-     */
-    private static String displayNamespace(DaResourceRow left, DaResourceRow right) {
-        if (left != null) {
-            return left.getNamespace();
-        }
-        if (right != null) {
-            return right.getPod();
-        }
-        return "";
-    }
-
     private static String firstNonBlank(
             DaResourceRow left,
             DaResourceRow right,
-            java.util.function.Function<DaResourceRow, String> getter) {
+            Function<DaResourceRow, String> getter) {
         if (left != null) {
             String v = getter.apply(left);
             if (v != null && !v.isBlank()) {
@@ -91,7 +80,7 @@ public class DaCsvComparisonService {
         }
         if (right != null) {
             String v = getter.apply(right);
-            if (v != null) {
+            if (v != null && !v.isBlank()) {
                 return v;
             }
         }

@@ -6,7 +6,9 @@ package com.example.demo.DTO;
 public class DaCompareRow {
 
     private String namespace;
-    /** Имя deployment (из имени Pod); для отображения во 2-й ключевой колонке */
+    /** Оригинальное имя Pod из CSV */
+    private String pod;
+    /** Имя deployment, извлечённое из Pod (без суффикса ReplicaSet) */
     private String deployment;
     private String containerName;
     private DaResourceRow left;
@@ -18,6 +20,14 @@ public class DaCompareRow {
 
     public void setNamespace(String namespace) {
         this.namespace = namespace;
+    }
+
+    public String getPod() {
+        return pod;
+    }
+
+    public void setPod(String pod) {
+        this.pod = pod;
     }
 
     public String getDeployment() {

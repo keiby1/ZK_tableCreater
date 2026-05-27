@@ -15,6 +15,8 @@ import java.util.function.Function;
 @Service
 public class DaCsvComparisonHtmlService {
 
+    private static final int KEY_COLUMN_COUNT = 4;
+
     private static final String[][] METRIC_COLUMNS = {
             {"cpu-requests", "CPU Requests"},
             {"cpu-limits", "CPU Limits"},
@@ -103,7 +105,8 @@ public class DaCsvComparisonHtmlService {
         html.append("    <h2>Сравнение: ").append(escapeHtml(name1)).append(" и ").append(escapeHtml(name2)).append("</h2>\n");
         html.append("    <p>Слева — метрики из <strong>").append(escapeHtml(name1)).append("</strong>, ");
         html.append("справа — из <strong>").append(escapeHtml(name2)).append("</strong>. ");
-        html.append("Сопоставление по namespace, deployment и container.</p>\n");
+        html.append("Сопоставление по namespace, deployment (из Pod) и container. "
+                + "Pod — исходное значение из файла.</p>\n");
         html.append("  </div>\n");
         html.append("  <div class=\"legend\">\n");
         html.append("    <details>\n");
@@ -127,6 +130,10 @@ public class DaCsvComparisonHtmlService {
         html.append("      <div class=\"filter-field\">\n");
         html.append("        <label for=\"filter-deployment\">Deployment</label>\n");
         html.append("        <input type=\"text\" id=\"filter-deployment\" placeholder=\"Часть имени…\" autocomplete=\"off\">\n");
+        html.append("      </div>\n");
+        html.append("      <div class=\"filter-field\">\n");
+        html.append("        <label for=\"filter-pod\">Pod</label>\n");
+        html.append("        <input type=\"text\" id=\"filter-pod\" placeholder=\"Часть имени…\" autocomplete=\"off\">\n");
         html.append("      </div>\n");
         html.append("      <div class=\"filter-field\">\n");
         html.append("        <label for=\"filter-container\">Container</label>\n");
@@ -157,7 +164,7 @@ public class DaCsvComparisonHtmlService {
         html.append("    <table id=\"da-compare-table\">\n");
         html.append("      <thead>\n");
         html.append("        <tr>\n");
-        html.append("          <th colspan=\"3\" class=\"key-col\">Ключ</th>\n");
+        html.append("          <th colspan=\"").append(KEY_COLUMN_COUNT).append("\" class=\"key-col\">Ключ</th>\n");
         html.append("          <th colspan=\"6\" class=\"group-left\" id=\"header-group-left\">")
                 .append(escapeHtml(name1)).append("</th>\n");
         html.append("          <th colspan=\"6\" class=\"group-right\" id=\"header-group-right\">")
@@ -166,6 +173,7 @@ public class DaCsvComparisonHtmlService {
         html.append("        <tr>\n");
         html.append("          <th class=\"key-col\">Namespace</th>\n");
         html.append("          <th class=\"key-col\">Deployment</th>\n");
+        html.append("          <th class=\"key-col\">Pod</th>\n");
         html.append("          <th class=\"key-col\">Container</th>\n");
         for (String[] col : METRIC_COLUMNS) {
             html.append("          <th class=\"group-left col-metric col-").append(col[0]).append("\">")
@@ -183,11 +191,13 @@ public class DaCsvComparisonHtmlService {
             DaResourceRow left = row.getLeft();
             DaResourceRow right = row.getRight();
             html.append("        <tr class=\"data-row\" data-namespace=\"")
-                    .append(escapeHtmlAttr(row.getNamespace())).append("\" data-deployment=\"")
+                    .append(escapeHtmlAttr(row.getNamespace())).append("\" data-pod=\"")
+                    .append(escapeHtmlAttr(row.getPod())).append("\" data-deployment=\"")
                     .append(escapeHtmlAttr(row.getDeployment())).append("\" data-container=\"")
                     .append(escapeHtmlAttr(row.getContainerName())).append("\">\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getNamespace())).append("</td>\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getDeployment())).append("</td>\n");
+            html.append("          <td class=\"key-col\">").append(escapeHtml(row.getPod())).append("</td>\n");
             html.append("          <td class=\"key-col\">").append(escapeHtml(row.getContainerName())).append("</td>\n");
             appendComparedMetricsRow(html, left, right);
             html.append("        </tr>\n");
@@ -200,37 +210,42 @@ public class DaCsvComparisonHtmlService {
         html.append("  <script>\n");
         html.append("    (function() {\n");
         html.append("      var nsInput = document.getElementById('filter-namespace');\n");
+        html.append("      var podInput = document.getElementById('filter-pod');\n");
         html.append("      var depInput = document.getElementById('filter-deployment');\n");
         html.append("      var contInput = document.getElementById('filter-container');\n");
         html.append("      var countEl = document.getElementById('filter-count');\n");
         html.append("      var clearBtn = document.getElementById('filter-clear');\n");
-        html.append("      function rowMatches(tr, nsQ, depQ, contQ) {\n");
+        html.append("      function rowMatches(tr, nsQ, podQ, depQ, contQ) {\n");
         html.append("        var ns = (tr.getAttribute('data-namespace') || '').toLowerCase();\n");
+        html.append("        var pod = (tr.getAttribute('data-pod') || '').toLowerCase();\n");
         html.append("        var dep = (tr.getAttribute('data-deployment') || '').toLowerCase();\n");
         html.append("        var cont = (tr.getAttribute('data-container') || '').toLowerCase();\n");
         html.append("        if (nsQ && ns.indexOf(nsQ) < 0) return false;\n");
+        html.append("        if (podQ && pod.indexOf(podQ) < 0) return false;\n");
         html.append("        if (depQ && dep.indexOf(depQ) < 0) return false;\n");
         html.append("        if (contQ && cont.indexOf(contQ) < 0) return false;\n");
         html.append("        return true;\n");
         html.append("      }\n");
         html.append("      function applyFilter() {\n");
         html.append("        var nsQ = nsInput.value.trim().toLowerCase();\n");
+        html.append("        var podQ = podInput.value.trim().toLowerCase();\n");
         html.append("        var depQ = depInput.value.trim().toLowerCase();\n");
         html.append("        var contQ = contInput.value.trim().toLowerCase();\n");
         html.append("        var rows = document.querySelectorAll('#da-compare-tbody tr.data-row');\n");
         html.append("        var visible = 0;\n");
         html.append("        rows.forEach(function(tr) {\n");
-        html.append("          var show = rowMatches(tr, nsQ, depQ, contQ);\n");
+        html.append("          var show = rowMatches(tr, nsQ, podQ, depQ, contQ);\n");
         html.append("          tr.style.display = show ? '' : 'none';\n");
         html.append("          if (show) visible++;\n");
         html.append("        });\n");
         html.append("        countEl.textContent = 'Показано: ' + visible + ' из ' + rows.length;\n");
         html.append("      }\n");
-        html.append("      [nsInput, depInput, contInput].forEach(function(el) {\n");
+        html.append("      [nsInput, depInput, podInput, contInput].forEach(function(el) {\n");
         html.append("        el.addEventListener('input', applyFilter);\n");
         html.append("      });\n");
         html.append("      clearBtn.addEventListener('click', function() {\n");
         html.append("        nsInput.value = '';\n");
+        html.append("        podInput.value = '';\n");
         html.append("        depInput.value = '';\n");
         html.append("        contInput.value = '';\n");
         html.append("        applyFilter();\n");

@@ -10,7 +10,7 @@ import com.example.demo.DTO.DaCsvParseException;
 import com.example.demo.Services.AppLayoutService;
 import com.example.demo.Services.DaCsvComparisonHtmlService;
 import com.example.demo.Services.DaCsvComparisonService;
-import com.example.demo.Services.DaCsvReaderService;
+import com.example.demo.Services.DaResourceExportReaderService;
 import com.example.demo.Services.ExcelTableService;
 import com.example.demo.Services.HtmlComparisonService;
 import com.example.demo.Services.HtmlParserService;
@@ -71,7 +71,7 @@ public class MainController {
     private PostgresDbChecksHtmlService postgresDbChecksHtmlService;
 
     @Autowired
-    private DaCsvReaderService daCsvReaderService;
+    private DaResourceExportReaderService daResourceExportReaderService;
 
     @Autowired
     private DaCsvComparisonService daCsvComparisonService;
@@ -291,7 +291,7 @@ public class MainController {
     }
 
     /**
-     * GET /compareDa — страница выбора двух CSV-файлов для сверки (логика сравнения — позже).
+     * GET /compareDa — страница выбора двух файлов выгрузки ДА (CSV или XLSX).
      */
     @GetMapping("/compareDa")
     public ResponseEntity<String> compareDaPage() {
@@ -302,7 +302,7 @@ public class MainController {
     }
 
     /**
-     * POST /compareDa — чтение двух CSV, left join и таблица сравнения.
+     * POST /compareDa — чтение двух файлов (CSV/XLSX), left join и таблица сравнения.
      */
     @PostMapping(value = "/compareDa", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> compareDaSubmit(
@@ -313,8 +313,8 @@ public class MainController {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_HTML);
         try {
-            DaCsvDocument doc1 = daCsvReaderService.read(file1);
-            DaCsvDocument doc2 = daCsvReaderService.read(file2);
+            DaCsvDocument doc1 = daResourceExportReaderService.read(file1);
+            DaCsvDocument doc2 = daResourceExportReaderService.read(file2);
             List<DaCompareRow> compareRows = daCsvComparisonService.compare(doc1, doc2);
             String html = daCsvComparisonHtmlService.generateComparisonPage(compareRows, file1Name, file2Name);
             return new ResponseEntity<>(html, headers, HttpStatus.OK);
@@ -400,10 +400,10 @@ public class MainController {
     private String buildCompareDaUploadPage() {
         return buildTwoFileUploadComparePage(
                 "/compareDa",
-                "Сравнение CSV (DA)",
-                "Сверка двух CSV-файлов (ДА)",
-                "Выберите два CSV-файла для сравнения. Перетащите файлы в зоны или нажмите для выбора.",
-                ".csv,text/csv",
+                "Сравнение выгрузок ДА",
+                "Сверка двух файлов (ДА)",
+                "Выберите два файла в формате CSV или XLSX (первый лист книги). Можно комбинировать форматы. Перетащите файлы в зоны или нажмите для выбора.",
+                ".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "Сравнить DA");
     }
 
