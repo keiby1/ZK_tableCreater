@@ -484,10 +484,10 @@ public class MainController {
     private List<Deployment> generateTestData() {
         List<Deployment> deployments = new LinkedList<>();
         
-        // Первый деплоймент - 3 пода
+        // Первый деплоймент — 5 подов (удобно проверить «Итого» × podCount)
         Deployment deployment1 = new Deployment();
         deployment1.setName("frontend-deployment");
-        deployment1.setPodCount(3);
+        deployment1.setPodCount(5);
         deployment1.setStartTime(45);
         deployment1.setContainers(new LinkedList<>());
         
@@ -541,7 +541,7 @@ public class MainController {
         
         deployments.add(deployment1);
         
-        // Второй деплоймент - 3 пода
+        // Второй деплоймент — 3 пода
         Deployment deployment2 = new Deployment();
         deployment2.setName("backend-deployment");
         deployment2.setPodCount(3);
@@ -598,10 +598,10 @@ public class MainController {
         
         deployments.add(deployment2);
         
-        // Третий деплоймент - 3 пода
+        // Третий деплоймент — 1 под
         Deployment deployment3 = new Deployment();
         deployment3.setName("monitoring-deployment");
-        deployment3.setPodCount(3);
+        deployment3.setPodCount(1);
         deployment3.setStartTime(150);
         deployment3.setContainers(new LinkedList<>());
         

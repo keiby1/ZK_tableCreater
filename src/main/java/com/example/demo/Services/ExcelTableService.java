@@ -102,10 +102,12 @@ public class ExcelTableService {
                     setPercent(row, col++, container.getThrottlingPercent());
                     setString(row, col, deployment.getStartTime() + " с");
 
-                    sumCpuRq += container.getCpuRq();
-                    sumCpuLim += container.getCpuLim();
-                    sumMemRq += container.getMemRq();
-                    sumMemLim += container.getMemLim();
+                    // В «Итого» — сумма по контейнерам × число подов деплоймента
+                    int pods = deployment.getPodCount();
+                    sumCpuRq += (long) container.getCpuRq() * pods;
+                    sumCpuLim += (long) container.getCpuLim() * pods;
+                    sumMemRq += (long) container.getMemRq() * pods;
+                    sumMemLim += (long) container.getMemLim() * pods;
                     sumCpuMaxUse += container.getCpuMaxPercent();
                     sumCpuAvgUse += container.getCpuAvgPercent();
                     sumCpuAvgAbsUse += container.getCpuAvgAbsUse();

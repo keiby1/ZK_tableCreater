@@ -215,14 +215,16 @@ public class HtmlTableService {
                 html.append("                <td data-block-key=\"container\">").append(container.getName()).append("</td>\n");
                 
                 // CpuRq, CpuLim, MemRq, MemLim (порядок столбцов)
+                // В «Итого» — сумма по контейнерам × число подов деплоймента
+                int pods = deployment.getPodCount();
                 appendTd(html, container.getCpuRq(), cpuRqClass, "cpuRq");
-                sumCpuRq += container.getCpuRq();
+                sumCpuRq += (long) container.getCpuRq() * pods;
                 appendTd(html, container.getCpuLim(), cpuLimClass, "cpuLim");
-                sumCpuLim += container.getCpuLim();
+                sumCpuLim += (long) container.getCpuLim() * pods;
                 appendTd(html, container.getMemRq(), memRqClass, "memRq");
-                sumMemRq += container.getMemRq();
+                sumMemRq += (long) container.getMemRq() * pods;
                 appendTd(html, container.getMemLim(), memLimClass, "memLim");
-                sumMemLim += container.getMemLim();
+                sumMemLim += (long) container.getMemLim() * pods;
                 
                 // ЦПУ утилизация макс с цветовой подсветкой
                 String cpuMaxClass = getCpuColorClass(container.getCpuMaxPercent());
