@@ -153,14 +153,41 @@ public class ExcelTableService {
             }
             setString(totals, tc, "—");
 
-            for (int i = 0; i <= LAST_COL; i++) {
-                sheet.autoSizeColumn(i);
-            }
+            // Не используем autoSizeColumn(): на headless Linux без шрифтов
+            // AWT/Fontconfig падает с "Fontconfig head is null".
+            applyFixedColumnWidths(sheet);
 
             wb.write(out);
             return out.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Ширина в единицах POI (1/256 символа). Без обращения к системным шрифтам.
+     */
+    private static void applyFixedColumnWidths(Sheet sheet) {
+        int[] widths = {
+                18, // Количество подов
+                28, // Workload
+                24, // Container
+                12, // CpuRq
+                12, // CpuLim
+                12, // MemRq
+                12, // MemLim
+                14, // CpuMaxUse
+                14, // CpuAvgUse
+                14, // CpuAvgAbsUse
+                14, // CpuMaxAbsUse
+                14, // MemMaxUse
+                14, // MemAvgUse
+                14, // MemAbsUse
+                14, // Троттлинг
+                16  // Время старта
+        };
+        for (int i = 0; i < widths.length; i++) {
+            sheet.setColumnWidth(i, widths[i] * 256);
         }
     }
 
